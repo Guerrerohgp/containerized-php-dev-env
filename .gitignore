@@ -11,8 +11,6 @@ docker/ssl/certs/*.pem
 
 # Database backups
 backups/
-*.sql
-*.sql.gz
 
 # macOS
 .DS_Store
@@ -33,16 +31,14 @@ Desktop.ini
 .vscode/
 *.swp
 *.swo
-*~
 
 # Logs
 *.log
 logs/
 
-# Dependencies (if any project files added)
+# Dependencies
 node_modules/
 vendor/
 
-# Docker volumes backup
-*.tar
-*.tar.gz
+# Docker compose overrides
+docker-compose.override.yml

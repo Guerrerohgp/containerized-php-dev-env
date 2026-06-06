@@ -52,11 +52,11 @@ goto end
 echo Restore databases from backup
 echo.
 echo Usage:
-echo   sail restore                      List available backups
-echo   sail restore ^<mysql^> ^<postgres^>   Restore both databases
-echo   sail restore --mysql ^<file^>       Restore MySQL only
-echo   sail restore --postgres ^<file^>    Restore PostgreSQL only
-echo   sail restore --list               List all backups
+echo   plod restore                      List available backups
+echo   plod restore ^<mysql^> ^<postgres^>   Restore both databases
+echo   plod restore --mysql ^<file^>       Restore MySQL only
+echo   plod restore --postgres ^<file^>    Restore PostgreSQL only
+echo   plod restore --list               List all backups
 echo.
 echo Note: Large database restores may take a long time.
 echo       Timeouts have been disabled to prevent interruption.
@@ -113,7 +113,7 @@ set MYSQL_BACKUP=%~1
 set POSTGRES_BACKUP=%~2
 
 if "%MYSQL_BACKUP%"=="" (
-    echo Usage: sail restore ^<mysql_backup^> ^<postgres_backup^>
+    echo Usage: plod restore ^<mysql_backup^> ^<postgres_backup^>
     echo.
     goto list
 )

@@ -6,21 +6,145 @@ A generic, configurable Docker development environment for PHP projects. Support
 
 ## Features
 
-- **Multiple PHP Versions**: 7.4, 8.0, 8.1, 8.2, 8.3
-- **Dual Database Support**: MySQL 8.0 and PostgreSQL 16 running simultaneously
-- **Built-in Services**: Redis, Mailpit (email testing), SSL proxy
+- **One-Command Setup**: `./plod init` walks you through project configuration and scaffolding
+- **Multiple PHP Versions**: 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5
+- **Dual Database Support**: MySQL 8.0 and PostgreSQL 16 (selectable via profiles)
+- **Built-in Services**: Redis, Mailpit (email testing), SSL proxy with SAN certificates
 - **Cross-Platform**: Works on macOS, Linux, and Windows
-- **Framework Agnostic**: Laravel, WordPress, Zend, generic PHP
-- **WP-CLI & Composer**: Pre-installed in container
+- **Framework Agnostic**: Laravel, WordPress, Laminas, or plain PHP
+- **Full Dev Toolchain**: Composer, WP-CLI, npm/yarn/pnpm, Node.js pre-installed
 - **Xdebug Ready**: Pre-configured for debugging
+- **Service Profiles**: Only start the services you need
 
 ## Requirements
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS/Windows) or Docker Engine (Linux)
 - Docker Compose v2.0+
-- Ports 80, 443, 3306, 5432, 6379, 8025 available
+
+## Installation
+
+### Global Install (Recommended)
+
+Install `plod` as a global command so you can start new projects from any directory:
+
+**macOS/Linux:**
+```bash
+git clone https://github.com/Guerrerohgp/phplocaldocker.git
+cd phplocaldocker
+./install.sh
+```
+
+**Windows (CMD as Administrator):**
+```cmd
+git clone https://github.com/Guerrerohgp/phplocaldocker.git
+cd phplocaldocker
+install.bat
+```
+
+After installation, you can use `plod` from anywhere:
+```bash
+mkdir my-project && cd my-project
+plod init
+```
+
+### Uninstall
+
+**macOS/Linux:**
+```bash
+rm /usr/local/bin/plod
+rm -rf ~/.plod
+```
+
+**Windows:**
+```cmd
+rmdir /s /q "%LOCALAPPDATA%\plod"
+REM Remove %LOCALAPPDATA%\plod\bin from PATH
+```
+
+## Updating & Upgrading
+
+### Update Global Template
+
+Pull the latest version of plod from the repository to update the global template:
+
+```bash
+plod update
+```
+
+This downloads the latest template files to `~/.plod` (or `%LOCALAPPDATA%\plod` on Windows). New projects created with `plod init` will use the updated template.
+
+### Upgrade an Existing Project
+
+Update an existing project's plod files to match the latest global template:
+
+```bash
+cd my-project
+plod upgrade
+```
+
+**What gets updated:**
+- `docker/` directory (Dockerfile, configs, scripts)
+- `docker-compose.yml`
+- `plod` and `plod.bat`
+- `.env.example`, `.gitignore`, `.gitattributes`, `.dockerignore`
+
+**What is preserved (never modified):**
+- `.env` (your configuration)
+- `public/` (your application code)
+- `backups/` (database backups)
+- `vendor/`, `node_modules/` (dependencies)
+- Any other project source code
+
+After upgrading, `.env.example` is backed up to `.env.example.bak` so you can review and merge any new configuration options. Then rebuild containers:
+
+```bash
+plod build
+plod up
+```
 
 ## Quick Start
+
+### Interactive Setup (Recommended)
+
+**With global install:**
+```bash
+mkdir my-project && cd my-project
+plod init
+```
+
+**Without global install:**
+```bash
+# 1. Clone or copy this project
+git clone https://github.com/Guerrerohgp/phplocaldocker.git my-project
+cd my-project
+
+# 2. Run the setup wizard
+./plod init
+```
+
+The wizard will ask you for:
+- Project name and domain
+- PHP version (7.4, 8.0 - 8.5)
+- Node.js version (18, 20, 22)
+- Framework (Laravel, WordPress, Laminas, or none)
+- Which databases to enable (MySQL, PostgreSQL, or both)
+- Which services to enable (Redis, Mailpit, SSL)
+
+It then generates your `.env`, builds containers, starts services, and optionally scaffolds your framework.
+
+**Windows (CMD):**
+```cmd
+REM With global install:
+mkdir my-project && cd my-project
+plod init
+
+REM Without global install:
+git clone https://github.com/Guerrerohgp/phplocaldocker.git my-project
+cd my-project
+plod.bat init
+```
+
+### Manual Setup
 
 ```bash
 # 1. Clone or copy this project
@@ -30,19 +154,22 @@ cd my-project
 # 2. Create environment file
 cp .env.example .env
 
-# 3. Build and start containers
-./sail build
-./sail up
+# 3. Edit .env to configure profiles and settings
+# COMPOSE_PROFILES=mysql,redis,mailpit,ssl
 
-# 4. Open in browser
+# 4. Build and start containers
+./plod build
+./plod up
+
+# 5. Open in browser
 open http://localhost
 ```
 
 **Windows (CMD):**
 ```cmd
 copy .env.example .env
-sail.bat build
-sail.bat up
+plod.bat build
+plod.bat up
 ```
 
 ## Configuration
@@ -53,19 +180,33 @@ Edit the `.env` file to customize your setup:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `COMPOSE_PROJECT_NAME` | `myapp` | Docker Compose project name (prevents conflicts between projects) |
 | `PROJECT_NAME` | `myapp` | Project identifier |
 | `PROJECT_DOMAIN` | `myapp.test` | Domain for SSL certificate |
+
+### Service Profiles
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COMPOSE_PROFILES` | `mysql,postgres,redis,mailpit,ssl` | Comma-separated list of services to enable |
+
+Available profiles: `mysql`, `postgres`, `redis`, `mailpit`, `ssl`
+
+Example for a minimal Laravel setup:
+```env
+COMPOSE_PROFILES=mysql,redis,mailpit
+```
 
 ### PHP Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PHP_VERSION` | `8.2` | PHP version (7.4, 8.0, 8.1, 8.2, 8.3) |
-| `NODE_VERSION` | `20` | Node.js version |
+| `PHP_VERSION` | `8.2` | PHP version (7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5) |
+| `NODE_VERSION` | `20` | Node.js version (18, 20, 22) |
 | `PHP_POST_MAX_SIZE` | `100M` | Maximum POST data size |
 | `PHP_UPLOAD_MAX_FILESIZE` | `100M` | Maximum upload file size |
 | `PHP_MAX_EXECUTION_TIME` | `300` | Maximum script execution time (seconds) |
-| `PHP_SHORT_OPEN_TAG` | `On` | Enable short open tags (`<?`) |
+| `PHP_SHORT_OPEN_TAG` | `Off` | Enable short open tags (`<?`) |
 
 ### Database Settings
 
@@ -85,7 +226,7 @@ Edit the `.env` file to customize your setup:
 | Service | Default Port | Env Variable |
 |---------|-------------|--------------|
 | HTTP | 80 | `APP_PORT` |
-| HTTPS | 443 | (fixed) |
+| HTTPS | 443 | `FORWARD_SSL_PORT` |
 | MySQL | 3306 | `FORWARD_DB_PORT` |
 | PostgreSQL | 5432 | `FORWARD_POSTGRES_PORT` |
 | Redis | 6379 | `FORWARD_REDIS_PORT` |
@@ -94,51 +235,64 @@ Edit the `.env` file to customize your setup:
 
 ## Commands
 
+### Setup
+
+```bash
+./plod init          # Interactive project setup wizard
+```
+
 ### Container Management
 
 ```bash
-./sail up          # Start containers
-./sail down        # Stop containers
-./sail build       # Build containers
-./sail ps          # List running containers
-./sail logs        # View container logs
-./sail stop        # Stop containers
-./sail restart     # Restart containers
+./plod up            # Start containers
+./plod up --build    # Build and start containers in one step
+./plod down          # Stop and remove containers
+./plod down -v       # Stop, remove containers AND volumes (deletes data!)
+./plod build         # Build containers
+./plod ps            # List running containers
+./plod logs          # View container logs
+./plod stop          # Stop containers
+./plod restart       # Restart containers
 ```
 
 ### Development
 
 ```bash
-./sail shell       # Open bash shell in app container
-./sail php -v      # Run PHP commands
-./sail composer install    # Run Composer
-./sail artisan migrate     # Run Laravel Artisan
-./sail wp plugin list      # Run WP-CLI
+./plod shell         # Open bash shell in app container
+./plod php -v        # Run PHP commands
+./plod composer install    # Run Composer
+./plod artisan migrate     # Run Laravel Artisan
+./plod wp plugin list      # Run WP-CLI
+./plod npm install         # Run npm
+./plod yarn install        # Run yarn
+./plod pnpm install        # Run pnpm
+./plod node -v             # Run Node.js
+./plod test                # Run PHPUnit tests
 ```
 
 ### Database
 
 ```bash
-./sail mysql       # Open MySQL CLI
-./sail psql        # Open PostgreSQL CLI
-./sail redis       # Open Redis CLI
+./plod mysql         # Open MySQL CLI
+./plod psql          # Open PostgreSQL CLI
+./plod redis         # Open Redis CLI
 ```
 
 ### Backup & Restore
 
 ```bash
-./sail backup                          # Backup all databases
-./sail restore --list                  # List available backups
-./sail restore <mysql> <postgres>      # Restore both databases
-./sail restore --mysql <file>          # Restore MySQL only
-./sail restore --postgres <file>       # Restore PostgreSQL only
+./plod backup                          # Backup all databases
+./plod restore --list                  # List available backups
+./plod restore <mysql> <postgres>      # Restore both databases
+./plod restore --mysql <file>          # Restore MySQL only
+./plod restore --postgres <file>       # Restore PostgreSQL only
 ```
 
 **Windows (CMD):**
 ```cmd
-sail.bat backup
-sail.bat restore --list
-sail.bat restore myapp_mysql_20240115_120000.sql myapp_postgres_20240115_120000.sql
+plod.bat backup
+plod.bat restore --list
+plod.bat restore myapp_mysql_20240115_120000.sql myapp_postgres_20240115_120000.sql
 ```
 
 Backups are stored in the `backups/` directory with timestamps in the format:
@@ -148,9 +302,11 @@ Backups are stored in the `backups/` directory with timestamps in the format:
 ### Utilities
 
 ```bash
-./sail ssl         # Generate SSL certificates
-./sail mailpit     # View Mailpit logs
-./sail help        # Show all commands
+./plod ssl           # Generate SSL certificates (with SANs)
+./plod mailpit       # View Mailpit logs
+./plod update        # Update global plod template to latest version
+./plod upgrade       # Upgrade this project's plod files from global template
+./plod help          # Show all commands
 ```
 
 ## Services
@@ -161,9 +317,9 @@ Backups are stored in the `backups/` directory with timestamps in the format:
 - PHP-FPM
 - Composer
 - WP-CLI
-- Node.js & npm
+- Node.js & npm/yarn/pnpm
 
-### MySQL (`mysql`)
+### MySQL (`mysql`) - Profile: `mysql`
 
 Default connection:
 ```
@@ -176,7 +332,7 @@ Password: secret
 
 Testing database: `testing` (auto-created)
 
-### PostgreSQL (`postgres`)
+### PostgreSQL (`postgres`) - Profile: `postgres`
 
 Default connection:
 ```
@@ -189,31 +345,33 @@ Password: secret
 
 Testing database: `testing` (auto-created)
 
-### Redis (`redis`)
+### Redis (`redis`) - Profile: `redis`
 
 ```
 Host: redis
 Port: 6379
 ```
 
-### Mailpit (`mailpit`)
+### Mailpit (`mailpit`) - Profile: `mailpit`
 
 Email testing tool with web UI at http://localhost:8025
 
 - SMTP: localhost:1025
 - Web UI: http://localhost:8025
 
-### SSL Proxy (`ssl-proxy`)
+### SSL Proxy (`ssl-proxy`) - Profile: `ssl`
 
-HTTPS termination at port 443, proxies to app container.
+HTTPS termination at port 443, proxies to app container. Supports WebSocket connections for HMR.
 
 ## SSL Certificates
 
-Generate self-signed SSL certificates:
+Generate self-signed SSL certificates with Subject Alternative Names (SANs):
 
 ```bash
-./sail ssl
+./plod ssl
 ```
+
+Certificates include SANs for: `your-domain.test`, `*.your-domain.test`, `localhost`, `127.0.0.1`, `::1`
 
 Then trust the certificate on your system:
 
@@ -237,12 +395,18 @@ Import-Certificate -FilePath "docker\ssl\certs\myapp.test.crt" -CertStoreLocatio
 
 ### Laravel
 
-1. Create new project:
+Using the wizard:
 ```bash
-./sail composer create-project laravel/laravel .
+./plod init
+# Select "laravel" when prompted for framework
 ```
 
-2. Configure `.env`:
+Manual:
+```bash
+./plod composer create-project laravel/laravel .
+```
+
+Configure `.env`:
 ```env
 DB_CONNECTION=mysql
 DB_HOST=mysql
@@ -262,12 +426,18 @@ MAIL_PORT=1025
 
 ### WordPress
 
-1. Download WordPress:
+Using the wizard:
 ```bash
-./sail wp core download
+./plod init
+# Select "wordpress" when prompted for framework
 ```
 
-2. Configure `wp-config.php`:
+Manual:
+```bash
+./plod wp core download
+```
+
+Configure `wp-config.php`:
 ```php
 define('DB_NAME', 'myapp');
 define('DB_USER', 'myapp');
@@ -275,11 +445,32 @@ define('DB_PASSWORD', 'secret');
 define('DB_HOST', 'mysql');
 ```
 
-### Zend / Laminas
+### Laminas
 
+Using the wizard:
 ```bash
-./sail composer create-project laminas/laminas-mvc-skeleton .
+./plod init
+# Select "laminas" when prompted for framework
 ```
+
+Manual:
+```bash
+./plod composer create-project laminas/laminas-mvc-skeleton .
+```
+
+## Multi-Project Support
+
+Each project uses `COMPOSE_PROJECT_NAME` to isolate containers and volumes. This means you can run multiple PHP projects simultaneously without conflicts.
+
+```env
+# Project A
+COMPOSE_PROJECT_NAME=project-a
+
+# Project B
+COMPOSE_PROJECT_NAME=project-b
+```
+
+Docker images are also namespaced: `project-a-plod-8.2/app` vs `project-b-plod-8.2/app`.
 
 ## Platform-Specific Notes
 
@@ -287,7 +478,7 @@ define('DB_HOST', 'mysql');
 
 - Requires Docker Desktop
 - File system performance is optimized by default
-- Use `./sail` for all commands
+- Use `./plod` for all commands
 
 ### Linux
 
@@ -300,39 +491,39 @@ sudo usermod -aG docker $USER
 ### Windows
 
 - Requires Docker Desktop with WSL2 backend
-- Use `sail.bat` in CMD
-- Or use `./sail` in PowerShell/WSL
+- Use `plod.bat` in CMD
+- Or use `./plod` in PowerShell/WSL
 
 ## Troubleshooting
 
 ### Docker Compose Fallback
 
-If the `sail` script fails due to environment issues (like line ending conflicts or missing shell permissions), you can always use native Docker Compose commands:
+If the `plod` script fails, you can always use native Docker Compose commands:
 
-| Sail Command | Docker Compose Equivalent |
+| Plod Command | Docker Compose Equivalent |
 |--------------|---------------------------|
-| `./sail up` | `docker compose up -d` |
-| `./sail down` | `docker compose down` |
-| `./sail build` | `docker compose build --build-arg WWWGROUP=$(id -g) --build-arg PHP_POST_MAX_SIZE=100M --build-arg PHP_UPLOAD_MAX_FILESIZE=100M --build-arg PHP_MAX_EXECUTION_TIME=300 --build-arg PHP_SHORT_OPEN_TAG=On` |
-| `./sail ps` | `docker compose ps` |
-| `./sail logs` | `docker compose logs -f` |
-| `./sail shell` | `docker compose exec app bash` |
-| `./sail php ...` | `docker compose exec app php ...` |
-| `./sail composer ...` | `docker compose exec app composer ...` |
-| `./sail artisan ...` | `docker compose exec app php artisan ...` |
-| `./sail wp ...` | `docker compose exec app wp ...` |
+| `./plod up` | `docker compose up -d` |
+| `./plod down` | `docker compose down` |
+| `./plod build` | `docker compose build --build-arg WWWGROUP=$(id -g) --build-arg PHP_POST_MAX_SIZE=100M --build-arg PHP_UPLOAD_MAX_FILESIZE=100M --build-arg PHP_MAX_EXECUTION_TIME=300 --build-arg PHP_SHORT_OPEN_TAG=Off` |
+| `./plod ps` | `docker compose ps` |
+| `./plod logs` | `docker compose logs -f` |
+| `./plod shell` | `docker compose exec app bash` |
+| `./plod php ...` | `docker compose exec app php ...` |
+| `./plod composer ...` | `docker compose exec app composer ...` |
+| `./plod artisan ...` | `docker compose exec app php artisan ...` |
+| `./plod wp ...` | `docker compose exec app wp ...` |
+| `./plod npm ...` | `docker compose exec app npm ...` |
 
 ### Script Permissions & Line Endings
 
-If you encounter `Permission denied` or `Command not found` when running `./sail`:
+If you encounter `Permission denied` or `Command not found` when running `./plod`:
 
 ```bash
 # Fix execution permissions
-chmod +x sail docker/scripts/*.sh docker/ssl/*.sh docker/php/start-container
+chmod +x plod docker/scripts/*.sh docker/ssl/*.sh docker/php/start-container
 
 # If scripts have Windows (CRLF) line endings on Linux/macOS
-# You can fix them using the 'tr' command:
-tr -d '\r' < sail > sail.tmp && mv sail.tmp sail && chmod +x sail
+tr -d '\r' < plod > plod.tmp && mv plod.tmp plod && chmod +x plod
 ```
 
 ### Port Already in Use
@@ -352,9 +543,8 @@ APP_PORT=8080
 Reset MySQL data:
 
 ```bash
-./sail down
-docker volume rm phplocaldocker_sail-mysql
-./sail up
+./plod down -v
+./plod up
 ```
 
 ### PHP-FPM Not Starting
@@ -362,13 +552,13 @@ docker volume rm phplocaldocker_sail-mysql
 Check container logs:
 
 ```bash
-docker exec phplocaldocker-app-1 php-fpm${PHP_VERSION} -t
+docker compose exec app php-fpm${PHP_VERSION} -t
 ```
 
 ### Clear All Docker Data
 
 ```bash
-./sail down -v  # Remove containers and volumes
+./plod down -v  # Remove containers and volumes
 docker system prune -a  # Clean all unused Docker resources
 ```
 
@@ -380,11 +570,13 @@ docker system prune -a  # Clean all unused Docker resources
 ├── .gitignore              # Git ignore rules
 ├── .dockerignore           # Docker build ignore rules
 ├── docker-compose.yml      # Docker services definition
-├── sail                    # CLI tool (macOS/Linux)
-├── sail.bat                # CLI tool (Windows)
+├── install.sh              # Global installer (macOS/Linux)
+├── install.bat             # Global installer (Windows)
+├── plod                    # CLI tool (macOS/Linux)
+├── plod.bat                # CLI tool (Windows)
 ├── SECURITY.md             # Security guidelines
 ├── public/                 # Web root
-│   └── index.php
+│   └── index.php           # Landing page
 ├── backups/                # Database backups (auto-created)
 └── docker/
     ├── mysql/
@@ -400,6 +592,8 @@ docker system prune -a  # Clean all unused Docker resources
     ├── postgres/
     │   └── create-testing-database.sh
     ├── scripts/
+    │   ├── init.sh         # Setup wizard (macOS/Linux)
+    │   ├── init.bat        # Setup wizard (Windows)
     │   ├── backup.sh       # Database backup (macOS/Linux)
     │   ├── backup.bat      # Database backup (Windows)
     │   ├── restore.sh      # Database restore (macOS/Linux)

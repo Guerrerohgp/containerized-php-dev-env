@@ -46,13 +46,13 @@ RUN apt-get install -y nginx
 
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN groupadd --force -g $WWWGROUP sail
-RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail
+RUN groupadd --force -g $WWWGROUP plod
+RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 plod
 
 COPY start-container /usr/local/bin/start-container
 COPY supervisord.conf /etc/supervisor/supervisord.conf
-COPY php.ini /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-COPY php.ini /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
+COPY php.ini /etc/php/${PHP_VERSION}/cli/conf.d/99-plod.ini
+COPY php.ini /etc/php/${PHP_VERSION}/fpm/conf.d/99-plod.ini
 COPY xdebug.ini /etc/php/${PHP_VERSION}/fpm/conf.d/20-xdebug.ini
 COPY xdebug.ini /etc/php/${PHP_VERSION}/cli/conf.d/20-xdebug.ini
 COPY fpm-env.conf /etc/php/${PHP_VERSION}/fpm/pool.d/z-env.conf
@@ -60,14 +60,14 @@ COPY nginx-default /etc/nginx/sites-available/default
 
 RUN sed -i "s/\${PHP_VERSION}/${PHP_VERSION}/g" /etc/supervisor/supervisord.conf
 RUN sed -i "s/\${PHP_VERSION}/${PHP_VERSION}/g" /etc/nginx/sites-available/default
-RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
+RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-plod.ini
+RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-plod.ini
 
 RUN chmod +x /usr/local/bin/start-container
 

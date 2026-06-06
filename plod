@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+
+set -e
+
+DOCKER_COMPOSE="docker-compose"
+if ! command -v docker-compose &> /dev/null; then
+    if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        DOCKER_COMPOSE="docker compose"
+    else
+        echo "docker-compose is not installed."
+        exit 1
+    fi
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+load_env() {
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        while IFS='=' read -r key value || [[ -n "$key" ]]; do
+            if [[ -n "$key" && ! "$key" =~ ^# ]]; then
+                value=$(echo "$value" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+                export "$key=$value"
+            fi
+        done < "$SCRIPT_DIR/.env"
+    fi
+}
+
+display_help() {
+    echo "Plod - Docker management for PHP projects"
+    echo ""
+    echo "Usage: ./plod [command] [options]"
+    echo ""
+    echo "Setup:"
+    echo "  init          Interactive project setup wizard"
+    echo ""
+    echo "Container Management:"
+    echo "  up            Start the containers"
+    echo "  down          Stop and remove containers"
+    echo "  build         Build the containers"
+    echo "  ps            List running containers"
+    echo "  logs          Show container logs"
+    echo "  stop          Stop the containers"
+    echo "  restart       Restart the containers"
+    echo ""
+    echo "Development:"
+    echo "  shell         Open a bash shell in the app container"
+    echo "  php           Run PHP commands"
+    echo "  composer      Run Composer commands"
+    echo "  artisan       Run artisan commands (Laravel)"
+    echo "  wp            Run WP-CLI commands"
+    echo "  npm           Run npm commands"
+    echo "  yarn          Run yarn commands"
+    echo "  pnpm          Run pnpm commands"
+    echo "  node          Run node commands"
+    echo "  test          Run PHPUnit tests"
+    echo ""
+    echo "Database:"
+    echo "  mysql         Open MySQL CLI"
+    echo "  psql          Open PostgreSQL CLI"
+    echo "  redis         Open Redis CLI"
+    echo ""
+    echo "Utilities:"
+    echo "  ssl           Generate SSL certificates"
+    echo "  mailpit       Show Mailpit logs"
+    echo "  backup        Backup all databases"
+    echo "  restore       Restore databases (./plod restore --help)"
+    echo "  update        Update global plod template to latest version"
+    echo "  upgrade       Upgrade this project's plod files from global template"
+    echo "  help          Show this help message"
+}
+
+load_env
+
+PROJECT_NAME="${PROJECT_NAME:-myapp}"
+PROJECT_DOMAIN="${PROJECT_DOMAIN:-myapp.test}"
+
+EXEC_FLAGS=""
+if [ ! -t 0 ]; then
+    EXEC_FLAGS="-T"
+fi
+
+if [ $# -gt 0 ]; then
+    case "$1" in
+        "init")
+            bash "$SCRIPT_DIR/docker/scripts/init.sh"
+            ;;
+        "up")
+            shift
+            if [ "${1:-}" = "--build" ]; then
+                shift
+                export WWWGROUP="${WWWGROUP:-1000}"
+                export PHP_POST_MAX_SIZE="${PHP_POST_MAX_SIZE:-100M}"
+                export PHP_UPLOAD_MAX_FILESIZE="${PHP_UPLOAD_MAX_FILESIZE:-100M}"
+                export PHP_MAX_EXECUTION_TIME="${PHP_MAX_EXECUTION_TIME:-300}"
+                export PHP_SHORT_OPEN_TAG="${PHP_SHORT_OPEN_TAG:-Off}"
+                $DOCKER_COMPOSE build --build-arg WWWGROUP=$WWWGROUP --build-arg PHP_POST_MAX_SIZE=$PHP_POST_MAX_SIZE --build-arg PHP_UPLOAD_MAX_FILESIZE=$PHP_UPLOAD_MAX_FILESIZE --build-arg PHP_MAX_EXECUTION_TIME=$PHP_MAX_EXECUTION_TIME --build-arg PHP_SHORT_OPEN_TAG=$PHP_SHORT_OPEN_TAG
+            fi
+            $DOCKER_COMPOSE up -d "$@"
+            ;;
+        "down")
+            shift
+            $DOCKER_COMPOSE down "$@"
+            ;;
+        "build")
+            export WWWGROUP="${WWWGROUP:-1000}"
+            export PHP_POST_MAX_SIZE="${PHP_POST_MAX_SIZE:-100M}"
+            export PHP_UPLOAD_MAX_FILESIZE="${PHP_UPLOAD_MAX_FILESIZE:-100M}"
+            export PHP_MAX_EXECUTION_TIME="${PHP_MAX_EXECUTION_TIME:-300}"
+            export PHP_SHORT_OPEN_TAG="${PHP_SHORT_OPEN_TAG:-Off}"
+            $DOCKER_COMPOSE build --build-arg WWWGROUP=$WWWGROUP --build-arg PHP_POST_MAX_SIZE=$PHP_POST_MAX_SIZE --build-arg PHP_UPLOAD_MAX_FILESIZE=$PHP_UPLOAD_MAX_FILESIZE --build-arg PHP_MAX_EXECUTION_TIME=$PHP_MAX_EXECUTION_TIME --build-arg PHP_SHORT_OPEN_TAG=$PHP_SHORT_OPEN_TAG
+            ;;
+        "ps")
+            $DOCKER_COMPOSE ps
+            ;;
+        "shell"|"bash")
+            $DOCKER_COMPOSE exec app bash
+            ;;
+        "logs")
+            $DOCKER_COMPOSE logs -f
+            ;;
+        "wp")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app wp "$@"
+            ;;
+        "composer")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app composer "$@"
+            ;;
+        "artisan")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app php artisan "$@"
+            ;;
+        "php")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app php "$@"
+            ;;
+        "npm")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app npm "$@"
+            ;;
+        "yarn")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app yarn "$@"
+            ;;
+        "pnpm")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app pnpm "$@"
+            ;;
+        "node")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app node "$@"
+            ;;
+        "test")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS app php vendor/bin/phpunit "$@"
+            ;;
+        "mysql")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS mysql mysql -u"${DB_USERNAME}" -p"${DB_PASSWORD}" "${DB_DATABASE}" "$@"
+            ;;
+        "psql")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+            ;;
+        "redis")
+            shift
+            $DOCKER_COMPOSE exec $EXEC_FLAGS redis redis-cli "$@"
+            ;;
+        "mailpit")
+            $DOCKER_COMPOSE logs -f mailpit
+            ;;
+        "stop")
+            $DOCKER_COMPOSE stop
+            ;;
+        "restart")
+            $DOCKER_COMPOSE restart
+            ;;
+        "ssl")
+            bash "$SCRIPT_DIR/docker/ssl/generate-certs.sh"
+            ;;
+        "backup")
+            bash "$SCRIPT_DIR/docker/scripts/backup.sh"
+            ;;
+        "restore")
+            shift
+            bash "$SCRIPT_DIR/docker/scripts/restore.sh" "$@"
+            ;;
+        "update")
+            PLOD_HOME_DIR="${PLOD_HOME:-$HOME/.plod}"
+            if [ ! -d "$PLOD_HOME_DIR" ]; then
+                echo "Error: Plod global template is not installed."
+                echo "Run install.sh first, or clone the repo and run ./install.sh"
+                exit 1
+            fi
+            repo_url="https://github.com/Guerrerohgp/phplocaldocker.git"
+            if [ -f "$PLOD_HOME_DIR/.plod-repo" ]; then
+                repo_url=$(cat "$PLOD_HOME_DIR/.plod-repo")
+            fi
+            old_version="unknown"
+            if [ -f "$PLOD_HOME_DIR/.plod-version" ]; then
+                old_version=$(cat "$PLOD_HOME_DIR/.plod-version")
+            fi
+            echo ""
+            echo "============================================="
+            echo "  Updating Plod"
+            echo "============================================="
+            echo ""
+            echo "  Repository: $repo_url"
+            echo "  Current version: ${old_version:0:8}"
+            echo ""
+            tmp_dir=$(mktemp -d)
+            echo "Cloning latest version..."
+            if ! git clone --depth 1 "$repo_url" "$tmp_dir" 2>/dev/null; then
+                echo "Error: Failed to clone repository."
+                rm -rf "$tmp_dir"
+                exit 1
+            fi
+            new_version=$(git -C "$tmp_dir" rev-parse HEAD 2>/dev/null || echo "unknown")
+            if [ "$old_version" = "$new_version" ]; then
+                echo ""
+                echo "Already up to date (version: ${new_version:0:8})."
+                rm -rf "$tmp_dir"
+                exit 0
+            fi
+            echo "Updating template files..."
+            rm -rf "$PLOD_HOME_DIR/docker"
+            cp -r "$tmp_dir/docker" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/docker-compose.yml" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/.env.example" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/.gitignore" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/.gitattributes" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/.dockerignore" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/plod" "$PLOD_HOME_DIR/"
+            cp "$tmp_dir/plod.bat" "$PLOD_HOME_DIR/"
+            rm -rf "$PLOD_HOME_DIR/public"
+            cp -r "$tmp_dir/public" "$PLOD_HOME_DIR/"
+            [ -f "$tmp_dir/README.md" ] && cp "$tmp_dir/README.md" "$PLOD_HOME_DIR/"
+            [ -f "$tmp_dir/LICENSE" ] && cp "$tmp_dir/LICENSE" "$PLOD_HOME_DIR/"
+            [ -f "$tmp_dir/SECURITY.md" ] && cp "$tmp_dir/SECURITY.md" "$PLOD_HOME_DIR/"
+            echo "$repo_url" > "$PLOD_HOME_DIR/.plod-repo"
+            echo "$new_version" > "$PLOD_HOME_DIR/.plod-version"
+            find "$PLOD_HOME_DIR" -name "*.sh" -exec chmod +x {} \;
+            chmod +x "$PLOD_HOME_DIR/plod"
+            chmod +x "$PLOD_HOME_DIR/docker/php/start-container"
+            rm -rf "$tmp_dir"
+            echo ""
+            echo "============================================="
+            echo "  Update Complete!"
+            echo "============================================="
+            echo ""
+            echo "  Previous version: ${old_version:0:8}"
+            echo "  New version:      ${new_version:0:8}"
+            echo ""
+            echo "  To update this project, run:"
+            echo "    plod upgrade"
+            echo ""
+            ;;
+        "upgrade")
+            PLOD_HOME_DIR="${PLOD_HOME:-$HOME/.plod}"
+            if [ ! -d "$PLOD_HOME_DIR" ]; then
+                echo "Error: Plod global template is not installed."
+                echo "Run install.sh first, or clone the repo and run ./install.sh"
+                exit 1
+            fi
+            template_version="unknown"
+            if [ -f "$PLOD_HOME_DIR/.plod-version" ]; then
+                template_version=$(cat "$PLOD_HOME_DIR/.plod-version")
+            fi
+            echo ""
+            echo "============================================="
+            echo "  Upgrading Project"
+            echo "============================================="
+            echo ""
+            echo "  Directory: $SCRIPT_DIR"
+            echo "  Template version: ${template_version:0:8}"
+            echo ""
+            echo "  This will update plod template files in your project."
+            echo "  Your .env, public/, backups/, and source code will NOT be modified."
+            echo ""
+            read -r -p "Continue? [Y/n]: " confirm
+            if [[ "$confirm" =~ ^[nN] ]]; then
+                echo "Upgrade cancelled."
+                exit 0
+            fi
+            echo ""
+            echo "Updating template files..."
+            rm -rf "$SCRIPT_DIR/docker"
+            cp -r "$PLOD_HOME_DIR/docker" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/docker-compose.yml" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/.dockerignore" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/plod" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/plod.bat" "$SCRIPT_DIR/"
+            if [ -f "$SCRIPT_DIR/.env.example" ]; then
+                cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env.example.bak"
+                echo "  Backed up .env.example -> .env.example.bak"
+            fi
+            cp "$PLOD_HOME_DIR/.env.example" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/.gitignore" "$SCRIPT_DIR/"
+            cp "$PLOD_HOME_DIR/.gitattributes" "$SCRIPT_DIR/"
+            [ -f "$PLOD_HOME_DIR/README.md" ] && cp "$PLOD_HOME_DIR/README.md" "$SCRIPT_DIR/"
+            [ -f "$PLOD_HOME_DIR/LICENSE" ] && cp "$PLOD_HOME_DIR/LICENSE" "$SCRIPT_DIR/"
+            [ -f "$PLOD_HOME_DIR/SECURITY.md" ] && cp "$PLOD_HOME_DIR/SECURITY.md" "$SCRIPT_DIR/"
+            find "$SCRIPT_DIR/docker" -name "*.sh" -exec chmod +x {} \;
+            chmod +x "$SCRIPT_DIR/plod"
+            chmod +x "$SCRIPT_DIR/docker/php/start-container"
+            echo ""
+            echo "============================================="
+            echo "  Upgrade Complete!"
+            echo "============================================="
+            echo ""
+            echo "  Template files updated to version ${template_version:0:8}."
+            echo "  Your .env, public/, backups/, and source code were preserved."
+            echo ""
+            echo "  If your docker-compose.yml or .env.example changed significantly,"
+            echo "  review the .env.example.bak backup and merge any custom settings."
+            echo ""
+            echo "  Run 'plod build' to rebuild containers with the new configuration."
+            echo ""
+            ;;
+        "help"|"--help"|"-h")
+            display_help
+            ;;
+        *)
+            echo "Unknown command: $1"
+            display_help
+            exit 1
+            ;;
+    esac
+else
+    display_help
+fi

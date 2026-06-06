@@ -6,7 +6,6 @@
 # Environment (should not be in build context)
 .env
 .env.*
-.env.old
 
 # SSL certificates (mounted as volume)
 docker/ssl/certs/
@@ -29,8 +28,16 @@ Thumbs.db
 
 # Docker files not needed in build
 docker-compose.yml
-sail
-sail.bat
+docker-compose.override.yml
+plod
+plod.bat
 
 # Logs
 *.log
+
+# Backups
+backups/
+
+# Dependencies
+node_modules/
+vendor/
