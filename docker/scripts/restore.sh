@@ -61,7 +61,7 @@ restore_mysql() {
     echo "This may take a while for large databases..."
     
     if [[ "$backup_file" == *.gz ]]; then
-        gunzip -c "$backup_file" | docker compose exec \
+        gunzip -c "$backup_file" | ${DOCKER_COMPOSE:-docker compose} exec \
             -T \
             -e COMPOSE_HTTP_TIMEOUT=86400 \
             mysql mysql \
@@ -71,7 +71,7 @@ restore_mysql() {
             --wait \
             --init-command="SET SESSION wait_timeout=28800, interactive_timeout=28800, net_read_timeout=28800, net_write_timeout=28800"
     else
-        docker compose exec \
+        ${DOCKER_COMPOSE:-docker compose} exec \
             -T \
             -e COMPOSE_HTTP_TIMEOUT=86400 \
             mysql mysql \
@@ -106,7 +106,7 @@ restore_postgres() {
     local psql_opts="-v ON_ERROR_STOP=1 -v statement_timeout=0 -v lock_timeout=0"
     
     if [[ "$backup_file" == *.gz ]]; then
-        gunzip -c "$backup_file" | docker compose exec \
+        gunzip -c "$backup_file" | ${DOCKER_COMPOSE:-docker compose} exec \
             -T \
             -e COMPOSE_HTTP_TIMEOUT=86400 \
             -e PGTZ=UTC \
@@ -115,7 +115,7 @@ restore_postgres() {
             --dbname="postgres" \
             $psql_opts
     else
-        docker compose exec \
+        ${DOCKER_COMPOSE:-docker compose} exec \
             -T \
             -e COMPOSE_HTTP_TIMEOUT=86400 \
             -e PGTZ=UTC \

@@ -2,15 +2,21 @@
 
 set -e
 
-DOCKER_COMPOSE="docker-compose"
-if ! command -v docker-compose &> /dev/null; then
-    if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+if [ -z "$DOCKER_COMPOSE" ]; then
+    if command -v podman-compose &> /dev/null; then
+        DOCKER_COMPOSE="podman-compose"
+    elif command -v podman &> /dev/null && podman compose version &> /dev/null; then
+        DOCKER_COMPOSE="podman compose"
+    elif command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE="docker-compose"
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
         DOCKER_COMPOSE="docker compose"
     else
-        echo "docker-compose is not installed."
+        echo "No container compose tool installed (podman-compose or docker-compose)."
         exit 1
     fi
 fi
+export DOCKER_COMPOSE
 
 detect_os() {
     case "$(uname -s)" in

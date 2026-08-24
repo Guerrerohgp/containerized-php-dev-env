@@ -1,16 +1,27 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set DOCKER_COMPOSE=docker-compose
-
-where docker-compose >nul 2>nul
-if %errorlevel% neq 0 (
-    docker compose version >nul 2>nul
+set DOCKER_COMPOSE=
+where podman-compose >nul 2>nul
+if %errorlevel% equ 0 (
+    set DOCKER_COMPOSE=podman-compose
+) else (
+    podman compose version >nul 2>nul
     if !errorlevel! equ 0 (
-        set DOCKER_COMPOSE=docker compose
+        set DOCKER_COMPOSE=podman compose
     ) else (
-        echo docker-compose is not installed.
-        exit /b 1
+        where docker-compose >nul 2>nul
+        if !errorlevel! equ 0 (
+            set DOCKER_COMPOSE=docker-compose
+        ) else (
+            docker compose version >nul 2>nul
+            if !errorlevel! equ 0 (
+                set DOCKER_COMPOSE=docker compose
+            ) else (
+                echo No container compose tool installed (podman-compose or docker-compose).
+                exit /b 1
+            )
+        )
     )
 )
 
