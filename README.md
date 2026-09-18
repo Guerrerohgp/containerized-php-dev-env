@@ -6,7 +6,7 @@ A generic, configurable Docker and Podman development environment for PHP projec
 
 ## Features
 
-- **Multiple PHP Versions**: 7.4, 8.0, 8.1, 8.2, 8.3
+- **Debian Slim Base**: Official PHP-FPM images, including legacy PHP 7.4; PHP 8.2 by default
 - **Dual Database Support**: MySQL 8.0 and PostgreSQL 16 running simultaneously
 - **Built-in Services**: Redis, Mailpit (email testing), SSL proxy
 - **Container Engines**: Docker and Podman with automatic Compose detection
@@ -106,13 +106,48 @@ Edit the `.env` file to customize your setup:
 
 | Variable                  | Default | Description                             |
 | ------------------------- | ------- | --------------------------------------- |
-| `PHP_VERSION`             | `8.2`   | PHP version (7.4, 8.0, 8.1, 8.2, 8.3)   |
+| `PHP_VERSION`             | `8.2`   | PHP version: 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5   |
 | `NODE_VERSION`            | `20`    | Node.js version                         |
 | `PHP_POST_MAX_SIZE`       | `100M`  | Maximum POST data size                  |
 | `PHP_UPLOAD_MAX_FILESIZE` | `100M`  | Maximum upload file size                |
 | `PHP_MAX_EXECUTION_TIME`  | `300`   | Maximum script execution time (seconds) |
 | `PHP_SHORT_OPEN_TAG`      | `On`    | Enable short open tags (`<?`)           |
 
+
+### App Image Base
+
+The app automatically selects an official Debian-based PHP-FPM image using `PHP_VERSION`:
+
+| PHP version | Debian base |
+|-------------|-------------|
+| 7.4, 8.0 | Bullseye (`php:<version>-fpm-bullseye`) |
+| 8.1, 8.2 (default), 8.3, 8.4, 8.5 | Bookworm Slim (`php:<version>-fpm-bookworm`) |
+
+To use PHP 7.4, set `PHP_VERSION=7.4` in `.env`, then run `./sail build app` and `./sail up --force-recreate app` (or the equivalent `sail.bat` commands). No separate Debian setting is needed. Legacy PHP versions use archived images; compatibility here does not imply ongoing upstream security support. Bullseye package sources are pinned to Debian’s 2026-09-01 snapshot in `docker/php/bullseye-sources.list`, since the live security mirror can no longer serve all indexed packages.
+
+PHP extensions are installed with the version-pinned [PHP extension installer](https://github.com/mlocati/docker-php-extension-installer), which removes temporary build dependencies. PHP 7.4, 8.0, and 8.1 use explicitly selected compatible Xdebug versions. Node.js/npm are copied from the matching `node:${NODE_VERSION}-bookworm-slim` image. Composer, WP-CLI, Nginx, Supervisor, and Xdebug remain included.
+
+CLI and FPM share `/usr/local/etc/php/conf.d/`. FPM configuration is in `/usr/local/etc/php-fpm.d/`, and Nginx connects to FPM on `127.0.0.1:9000` inside the app container.
+
+Rebuild and recreate the app after switching from the Ubuntu image:
+
+```bash
+./sail build app
+./sail up --force-recreate app
+```
+
+To validate a standalone default build without starting databases or publishing ports:
+
+```bash
+docker build -t phplocaldocker-smoke docker/php
+bash tests/image-smoke.sh phplocaldocker-smoke docker 8.2
+
+# Validate the legacy PHP path too
+docker build --build-arg PHP_VERSION=7.4 -t phplocaldocker-smoke:7.4 docker/php
+bash tests/image-smoke.sh phplocaldocker-smoke:7.4 docker 7.4
+```
+
+For Podman, use `podman build` and pass `podman` as the test script's second argument. The test checks default PHP settings, extensions, development tools, and Nginx-to-FPM requests. Final image size depends on the selected versions and included tools.
 
 ### Database Settings
 
@@ -428,7 +463,8 @@ docker volume rm phplocaldocker_sail-mysql
 Check container logs:
 
 ```bash
-docker exec phplocaldocker-app-1 php-fpm${PHP_VERSION} -t
+./sail shell
+php-fpm -t
 ```
 
 ### Clear All Docker Data
@@ -457,6 +493,7 @@ docker system prune -a  # Clean all unused Docker resources
     │   └── create-testing-database.sh
     ├── php/
     │   ├── Dockerfile
+    │   ├── bullseye-sources.list # Frozen package sources for legacy PHP
     │   ├── php.ini
     │   ├── xdebug.ini
     │   ├── supervisord.conf
