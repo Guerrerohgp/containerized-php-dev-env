@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set DOCKER_COMPOSE=
+if defined DOCKER_COMPOSE goto compose_ready
 where podman-compose >nul 2>nul
 if %errorlevel% equ 0 (
     set DOCKER_COMPOSE=podman-compose
@@ -25,6 +25,7 @@ if %errorlevel% equ 0 (
     )
 )
 
+:compose_ready
 if "%1"=="" goto help
 if "%1"=="help" goto help
 if "%1"=="--help" goto help
@@ -54,12 +55,12 @@ set PROJECT_DOMAIN=%PROJECT_DOMAIN%
 if "%PROJECT_DOMAIN%"=="" set PROJECT_DOMAIN=myapp.test
 
 if "%1"=="up" (
-    %DOCKER_COMPOSE% up -d
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% up -d"
+    goto forward_arguments
 )
 if "%1"=="down" (
-    %DOCKER_COMPOSE% down
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% down"
+    goto forward_arguments
 )
 if "%1"=="build" (
     if "%WWWGROUP%"=="" set WWWGROUP=1000
@@ -67,12 +68,12 @@ if "%1"=="build" (
     if "%PHP_UPLOAD_MAX_FILESIZE%"=="" set PHP_UPLOAD_MAX_FILESIZE=100M
     if "%PHP_MAX_EXECUTION_TIME%"=="" set PHP_MAX_EXECUTION_TIME=300
     if "%PHP_SHORT_OPEN_TAG%"=="" set PHP_SHORT_OPEN_TAG=On
-    %DOCKER_COMPOSE% build --build-arg WWWGROUP=%WWWGROUP% --build-arg PHP_POST_MAX_SIZE=%PHP_POST_MAX_SIZE% --build-arg PHP_UPLOAD_MAX_FILESIZE=%PHP_UPLOAD_MAX_FILESIZE% --build-arg PHP_MAX_EXECUTION_TIME=%PHP_MAX_EXECUTION_TIME% --build-arg PHP_SHORT_OPEN_TAG=%PHP_SHORT_OPEN_TAG%
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% build --build-arg WWWGROUP=!WWWGROUP! --build-arg PHP_POST_MAX_SIZE=!PHP_POST_MAX_SIZE! --build-arg PHP_UPLOAD_MAX_FILESIZE=!PHP_UPLOAD_MAX_FILESIZE! --build-arg PHP_MAX_EXECUTION_TIME=!PHP_MAX_EXECUTION_TIME! --build-arg PHP_SHORT_OPEN_TAG=!PHP_SHORT_OPEN_TAG!"
+    goto forward_arguments
 )
 if "%1"=="ps" (
-    %DOCKER_COMPOSE% ps
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% ps"
+    goto forward_arguments
 )
 if "%1"=="shell" (
     %DOCKER_COMPOSE% exec app bash
@@ -83,28 +84,24 @@ if "%1"=="bash" (
     goto end
 )
 if "%1"=="logs" (
-    %DOCKER_COMPOSE% logs -f
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% logs -f"
+    goto forward_arguments
 )
 if "%1"=="wp" (
-    shift
-    %DOCKER_COMPOSE% exec app wp %*
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app wp"
+    goto forward_arguments
 )
 if "%1"=="composer" (
-    shift
-    %DOCKER_COMPOSE% exec app composer %*
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app composer"
+    goto forward_arguments
 )
 if "%1"=="artisan" (
-    shift
-    %DOCKER_COMPOSE% exec app php artisan %*
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app php artisan"
+    goto forward_arguments
 )
 if "%1"=="php" (
-    shift
-    %DOCKER_COMPOSE% exec app php %*
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app php"
+    goto forward_arguments
 )
 if "%1"=="mysql" (
     %DOCKER_COMPOSE% exec mysql mysql -u%DB_USERNAME% -p%DB_PASSWORD% %DB_DATABASE%
@@ -119,16 +116,16 @@ if "%1"=="redis" (
     goto end
 )
 if "%1"=="mailpit" (
-    %DOCKER_COMPOSE% logs -f mailpit
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% logs -f mailpit"
+    goto forward_arguments
 )
 if "%1"=="stop" (
-    %DOCKER_COMPOSE% stop
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% stop"
+    goto forward_arguments
 )
 if "%1"=="restart" (
-    %DOCKER_COMPOSE% restart
-    goto end
+    set "SAIL_RUN=%DOCKER_COMPOSE% restart"
+    goto forward_arguments
 )
 if "%1"=="ssl" (
     call docker\ssl\generate-certs.bat
@@ -139,14 +136,27 @@ if "%1"=="backup" (
     goto end
 )
 if "%1"=="restore" (
-    shift
-    call docker\scripts\restore.bat %*
-    goto end
+    set "SAIL_RUN=call docker\scripts\restore.bat"
+    goto forward_arguments
 )
 
 echo Unknown command: %1
 echo Run 'sail help' for available commands.
 exit /b 1
+
+rem SHIFT does not change %*. Collect only the arguments after the Sail command.
+:forward_arguments
+setlocal disabledelayedexpansion
+set "SAIL_ARGS="
+:collect_arguments
+shift
+if "%1"=="" goto run_command
+set SAIL_ARGS=%SAIL_ARGS% %1
+goto collect_arguments
+:run_command
+%SAIL_RUN% %SAIL_ARGS%
+endlocal
+goto end
 
 :help
 echo Sail - Docker management for PHP projects
