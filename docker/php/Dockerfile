@@ -1,12 +1,22 @@
 ARG PHP_VERSION=8.2
-FROM docker.io/library/ubuntu:22.04
+ARG NODE_VERSION=20
+FROM docker.io/library/node:${NODE_VERSION}-bookworm-slim AS node
+# Preserve the existing PHP_VERSION switch, including archived legacy images.
+FROM docker.io/library/php:7.4-fpm-bullseye AS php-7.4
+COPY bullseye-sources.list /etc/apt/sources.list
+FROM docker.io/library/php:8.0-fpm-bullseye AS php-8.0
+COPY bullseye-sources.list /etc/apt/sources.list
+FROM docker.io/library/php:8.1-fpm-bookworm AS php-8.1
+FROM docker.io/library/php:8.2-fpm-bookworm AS php-8.2
+FROM docker.io/library/php:8.3-fpm-bookworm AS php-8.3
+FROM docker.io/library/php:8.4-fpm-bookworm AS php-8.4
+FROM docker.io/library/php:8.5-fpm-bookworm AS php-8.5
+FROM php-${PHP_VERSION} AS app
 
 LABEL maintainer="PHP Docker"
 
-ARG WWWGROUP
-ARG NODE_VERSION=20
-ARG PHP_VERSION
-
+ARG WWWGROUP=1000
+ARG PHP_EXTENSION_INSTALLER_VERSION=2.11.15
 ARG PHP_POST_MAX_SIZE=100M
 ARG PHP_UPLOAD_MAX_FILESIZE=100M
 ARG PHP_MAX_EXECUTION_TIME=300
@@ -14,63 +24,63 @@ ARG PHP_SHORT_OPEN_TAG=On
 
 WORKDIR /var/www/html
 
-ENV DEBIAN_FRONTEND noninteractive
 ENV TZ=UTC
-ENV PHP_VERSION=${PHP_VERSION}
 
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-RUN apt-get update && apt-get install -y \
-    gnupg gosu curl ca-certificates zip unzip git supervisor sqlite3 \
-    libcap2-bin libpng-dev python3 software-properties-common gettext-base \
+# Install runtime tools without the Ubuntu PPA or recommended packages.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl zip unzip git supervisor sqlite3 nginx \
     && rm -rf /var/lib/apt/lists/*
 
-RUN add-apt-repository -y ppa:ondrej/php && apt-get update
+# The installer removes extension build dependencies when it finishes.
+RUN curl -fsSL \
+    "https://github.com/mlocati/docker-php-extension-installer/releases/download/${PHP_EXTENSION_INSTALLER_VERSION}/install-php-extensions" \
+    -o /usr/local/bin/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions \
+    && case "$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" in \
+        7.4) xdebug_extension=xdebug-3.1.6 ;; \
+        8.0) xdebug_extension=xdebug-3.2.2 ;; \
+        8.1) xdebug_extension=xdebug-3.3.2 ;; \
+        *) xdebug_extension=xdebug ;; \
+    esac \
+    && install-php-extensions \
+        bcmath gd intl mysqli pdo_mysql pgsql pdo_pgsql zip \
+        imap soap tidy redis "$xdebug_extension" opcache \
+    && rm /usr/local/bin/install-php-extensions
 
-RUN apt-get install -y php${PHP_VERSION} php${PHP_VERSION}-fpm php${PHP_VERSION}-mysql \
-    php${PHP_VERSION}-pgsql php${PHP_VERSION}-sqlite3 php${PHP_VERSION}-gd php${PHP_VERSION}-curl \
-    php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml php${PHP_VERSION}-zip php${PHP_VERSION}-bcmath \
-    php${PHP_VERSION}-intl php${PHP_VERSION}-redis php${PHP_VERSION}-imap php${PHP_VERSION}-soap \
-    php${PHP_VERSION}-tidy php${PHP_VERSION}-xdebug
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php \
+    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+    && rm /tmp/composer-setup.php \
+    && curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+        -o /usr/local/bin/wp \
+    && chmod +x /usr/local/bin/wp
 
-RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-    && chmod +x wp-cli.phar \
-    && mv wp-cli.phar /usr/local/bin/wp
-
-RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-RUN apt-get install -y nodejs
-
-RUN apt-get install -y nginx
-
-RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN groupadd --force -g $WWWGROUP sail
-RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail
+RUN groupadd --force -g "$WWWGROUP" sail \
+    && useradd -ms /bin/bash --no-user-group -g "$WWWGROUP" -u 1337 sail
 
 COPY start-container /usr/local/bin/start-container
 COPY supervisord.conf /etc/supervisor/supervisord.conf
-COPY php.ini /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-COPY php.ini /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-COPY xdebug.ini /etc/php/${PHP_VERSION}/fpm/conf.d/20-xdebug.ini
-COPY xdebug.ini /etc/php/${PHP_VERSION}/cli/conf.d/20-xdebug.ini
-COPY fpm-env.conf /etc/php/${PHP_VERSION}/fpm/pool.d/z-env.conf
+COPY php.ini /usr/local/etc/php/conf.d/99-sail.ini
+COPY xdebug.ini /usr/local/etc/php/conf.d/99-xdebug-settings.ini
+COPY fpm-env.conf /usr/local/etc/php-fpm.d/zzz-sail.conf
 COPY nginx-default /etc/nginx/sites-available/default
 
-RUN sed -i "s/\${PHP_VERSION}/${PHP_VERSION}/g" /etc/supervisor/supervisord.conf
-RUN sed -i "s/\${PHP_VERSION}/${PHP_VERSION}/g" /etc/nginx/sites-available/default
-RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/cli/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-RUN sed -i "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" /etc/php/${PHP_VERSION}/fpm/conf.d/99-sail.ini
-
-RUN chmod +x /usr/local/bin/start-container
+# CLI and FPM use the same configuration in the official PHP image.
+RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
+    && sed -i \
+        -e "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" \
+        -e "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" \
+        -e "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" \
+        -e "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" \
+        "$PHP_INI_DIR/conf.d/99-sail.ini" \
+    && chmod +x /usr/local/bin/start-container
 
 EXPOSE 80
 
 ENTRYPOINT ["start-container"]
+# Clear the upstream php-fpm CMD: Supervisor starts both FPM and Nginx.
+CMD []
