@@ -1,5 +1,5 @@
 ARG PHP_VERSION=8.2
-FROM ubuntu:22.04
+FROM docker.io/library/ubuntu:22.04
 
 LABEL maintainer="PHP Docker"
 

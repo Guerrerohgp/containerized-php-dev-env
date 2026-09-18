@@ -44,7 +44,7 @@ POSTGRES_BACKUP="$BACKUP_DIR/${PROJECT_NAME}_postgres_${TIMESTAMP}.sql"
 
 echo "Backing up MySQL database: $DB_DATABASE"
 echo "This may take a while for large databases..."
-docker compose exec \
+${DOCKER_COMPOSE:-docker compose} exec \
     -T \
     -e COMPOSE_HTTP_TIMEOUT=86400 \
     mysql mysqldump \
@@ -64,7 +64,7 @@ echo "MySQL backup saved: ${MYSQL_BACKUP}.gz"
 echo ""
 echo "Backing up PostgreSQL database: $POSTGRES_DB"
 echo "This may take a while for large databases..."
-docker compose exec \
+${DOCKER_COMPOSE:-docker compose} exec \
     -T \
     -e COMPOSE_HTTP_TIMEOUT=86400 \
     postgres pg_dump \

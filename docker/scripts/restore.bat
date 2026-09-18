@@ -11,6 +11,8 @@ for %%i in ("%BACKUP_DIR%.") do set BACKUP_DIR=%%~dpi
 set COMPOSE_HTTP_TIMEOUT=86400
 set COMPOSE_TTY=0
 
+if "%DOCKER_COMPOSE%"=="" set DOCKER_COMPOSE=docker compose
+
 if exist "%PROJECT_ROOT%.env" (
     for /f "usebackq tokens=1,* delims==" %%a in ("%PROJECT_ROOT%.env") do (
         set "line=%%a"
@@ -76,7 +78,7 @@ if not exist "%BACKUP_FILE%" (
 echo Restoring MySQL from: %BACKUP_FILE%
 echo This may take a while for large databases...
 echo Waiting for MySQL to be ready...
-docker compose exec -T -e COMPOSE_HTTP_TIMEOUT=86400 mysql mysql --user=%DB_USERNAME% --password=%DB_PASSWORD% --connect-timeout=28800 --wait --init-command="SET SESSION wait_timeout=28800, interactive_timeout=28800, net_read_timeout=28800, net_write_timeout=28800" < "%BACKUP_FILE%"
+%DOCKER_COMPOSE% exec -T -e COMPOSE_HTTP_TIMEOUT=86400 mysql mysql --user=%DB_USERNAME% --password=%DB_PASSWORD% --connect-timeout=28800 --wait --init-command="SET SESSION wait_timeout=28800, interactive_timeout=28800, net_read_timeout=28800, net_write_timeout=28800" < "%BACKUP_FILE%"
 if %errorlevel% equ 0 (
     echo MySQL restore complete!
 ) else (
@@ -99,7 +101,7 @@ if not exist "%BACKUP_FILE%" (
 echo Restoring PostgreSQL from: %BACKUP_FILE%
 echo This may take a while for large databases...
 set PGOPTIONS=-c statement_timeout=0 -c lock_timeout=0
-docker compose exec -T -e COMPOSE_HTTP_TIMEOUT=86400 -e PGOPTIONS=%PGOPTIONS% postgres psql --username=%POSTGRES_USER% --dbname=postgres -v ON_ERROR_STOP=1 -v statement_timeout=0 -v lock_timeout=0 < "%BACKUP_FILE%"
+%DOCKER_COMPOSE% exec -T -e COMPOSE_HTTP_TIMEOUT=86400 -e PGOPTIONS=%PGOPTIONS% postgres psql --username=%POSTGRES_USER% --dbname=postgres -v ON_ERROR_STOP=1 -v statement_timeout=0 -v lock_timeout=0 < "%BACKUP_FILE%"
 if %errorlevel% equ 0 (
     echo PostgreSQL restore complete!
 ) else (
@@ -133,7 +135,7 @@ if not exist "%POSTGRES_BACKUP%" (
 echo.
 echo Restoring MySQL from: %MYSQL_BACKUP%
 echo This may take a while for large databases...
-docker compose exec -T -e COMPOSE_HTTP_TIMEOUT=86400 mysql mysql --user=%DB_USERNAME% --password=%DB_PASSWORD% --connect-timeout=28800 --wait --init-command="SET SESSION wait_timeout=28800, interactive_timeout=28800, net_read_timeout=28800, net_write_timeout=28800" < "%MYSQL_BACKUP%"
+%DOCKER_COMPOSE% exec -T -e COMPOSE_HTTP_TIMEOUT=86400 mysql mysql --user=%DB_USERNAME% --password=%DB_PASSWORD% --connect-timeout=28800 --wait --init-command="SET SESSION wait_timeout=28800, interactive_timeout=28800, net_read_timeout=28800, net_write_timeout=28800" < "%MYSQL_BACKUP%"
 if %errorlevel% equ 0 (
     echo MySQL restore complete!
 ) else (
@@ -145,7 +147,7 @@ echo.
 echo Restoring PostgreSQL from: %POSTGRES_BACKUP%
 echo This may take a while for large databases...
 set PGOPTIONS=-c statement_timeout=0 -c lock_timeout=0
-docker compose exec -T -e COMPOSE_HTTP_TIMEOUT=86400 -e PGOPTIONS=%PGOPTIONS% postgres psql --username=%POSTGRES_USER% --dbname=postgres -v ON_ERROR_STOP=1 -v statement_timeout=0 -v lock_timeout=0 < "%POSTGRES_BACKUP%"
+%DOCKER_COMPOSE% exec -T -e COMPOSE_HTTP_TIMEOUT=86400 -e PGOPTIONS=%PGOPTIONS% postgres psql --username=%POSTGRES_USER% --dbname=postgres -v ON_ERROR_STOP=1 -v statement_timeout=0 -v lock_timeout=0 < "%POSTGRES_BACKUP%"
 if %errorlevel% equ 0 (
     echo PostgreSQL restore complete!
 ) else (
