@@ -19,21 +19,47 @@ backups/
 .AppleDouble
 .LSOverride
 ._*
+.Spotlight-V100/
+.Trashes/
+.TemporaryItems/
+.fseventsd/
+.DocumentRevisions-V100/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 
 # Windows
 Thumbs.db
+Thumbs.db:encryptable
 ehthumbs.db
-Desktop.ini
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.stackdump
+*:Zone.Identifier
 
 # Linux
 *~
+.directory
+.Trash-*/
+.nfs*
 
 # IDE / Editor
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
+*.swn
+*.sublime-workspace
+.history/
+.#*
+\#*#
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
 
 # Logs
 *.log
@@ -42,6 +68,31 @@ logs/
 # Dependencies (if any project files added)
 node_modules/
 vendor/
+
+# PHP tooling and test output
+.phpunit.cache/
+.phpunit.result.cache
+.php-cs-fixer.cache
+/coverage/
+
+# JavaScript tooling caches
+.npm/
+.eslintcache
+.stylelintcache
+.parcel-cache/
+.vite/
+
+# Python test helpers and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local code index (each checkout generates its own)
+/.codegraph/
 
 # Docker volumes backup
 *.tar
