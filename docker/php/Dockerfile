@@ -1,4 +1,4 @@
-ARG PHP_VERSION=8.2
+ARG PHP_VERSION=8.5
 ARG NODE_VERSION=20
 FROM docker.io/library/node:${NODE_VERSION}-bookworm-slim AS node
 # Preserve the existing PHP_VERSION switch, including archived legacy images.

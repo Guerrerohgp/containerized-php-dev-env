@@ -29,8 +29,8 @@ Thumbs.db
 
 # Docker files not needed in build
 docker-compose.yml
-sail
-sail.bat
+dev
+dev.bat
 
 # Logs
 *.log
