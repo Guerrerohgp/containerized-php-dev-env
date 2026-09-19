@@ -3,7 +3,7 @@
 
 # Shell scripts should always use LF
 *.sh text eol=lf
-sail text eol=lf
+dev text eol=lf
 docker/php/start-container text eol=lf
 
 # Batch files should always use CRLF

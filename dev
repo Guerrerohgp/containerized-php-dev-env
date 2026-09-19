@@ -41,9 +41,9 @@ load_env() {
 }
 
 display_help() {
-    echo "Sail - Docker management for PHP projects"
+    echo "Dev - Docker and Podman management for PHP projects"
     echo ""
-    echo "Usage: ./sail [command]"
+    echo "Usage: ./dev [command]"
     echo ""
     echo "Commands:"
     echo "  up          Start the containers"
@@ -64,7 +64,7 @@ display_help() {
     echo "  restart     Restart the containers"
     echo "  ssl         Generate SSL certificates"
     echo "  backup      Backup all databases"
-    echo "  restore     Restore databases (./sail restore --help)"
+    echo "  restore     Restore databases (./dev restore --help)"
     echo "  help        Show this help message"
 }
 

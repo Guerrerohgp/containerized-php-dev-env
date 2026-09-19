@@ -134,7 +134,7 @@ restore_both() {
     local postgres_backup="$2"
     
     if [[ -z "$mysql_backup" ]] || [[ -z "$postgres_backup" ]]; then
-        echo "Usage: ./sail restore <mysql_backup> <postgres_backup>"
+        echo "Usage: ./dev restore <mysql_backup> <postgres_backup>"
         echo ""
         list_backups
         exit 1

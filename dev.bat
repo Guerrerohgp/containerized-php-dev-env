@@ -141,10 +141,10 @@ if "%1"=="restore" (
 )
 
 echo Unknown command: %1
-echo Run 'sail help' for available commands.
+echo Run 'dev help' for available commands.
 exit /b 1
 
-rem SHIFT does not change %*. Collect only the arguments after the Sail command.
+rem SHIFT does not change %*. Collect only the arguments after the Dev command.
 :forward_arguments
 setlocal disabledelayedexpansion
 set "SAIL_ARGS="
@@ -159,9 +159,9 @@ endlocal
 goto end
 
 :help
-echo Sail - Docker management for PHP projects
+echo Dev - Docker and Podman management for PHP projects
 echo.
-echo Usage: sail [command]
+echo Usage: dev [command]
 echo.
 echo Commands:
 echo   up          Start the containers

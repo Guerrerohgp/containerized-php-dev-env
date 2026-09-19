@@ -6,7 +6,7 @@ A generic, configurable Docker and Podman development environment for PHP projec
 
 ## Features
 
-- **Debian Slim Base**: Official PHP-FPM images, including legacy PHP 7.4; PHP 8.2 by default
+- **Debian Slim Base**: Official PHP-FPM images, including legacy PHP 7.4; PHP 8.5 by default
 - **Dual Database Support**: MySQL 8.0 and PostgreSQL 16 running simultaneously
 - **Built-in Services**: Redis, Mailpit (email testing), SSL proxy
 - **Container Engines**: Docker and Podman with automatic Compose detection
@@ -24,16 +24,16 @@ A generic, configurable Docker and Podman development environment for PHP projec
 
 ```bash
 # 1. Clone or copy this project
-git clone https://github.com/Guerrerohgp/phplocaldocker.git my-project
+git clone https://github.com/Guerrerohgp/containerized-php-dev-env.git my-project
 cd my-project
 
 # 2. Create environment file
 cp .env.example .env
 
 # 3. Build and start containers
-./sail build
-./sail ssl
-./sail up
+./dev build
+./dev ssl
+./dev up
 
 # 4. Open in browser
 open http://localhost:8080
@@ -43,14 +43,14 @@ open http://localhost:8080
 
 ```cmd
 copy .env.example .env
-sail.bat build
-sail.bat ssl
-sail.bat up
+dev.bat build
+dev.bat ssl
+dev.bat up
 ```
 
 ## Podman Support
 
-Podman is supported by `./sail` (macOS/Linux) and `sail.bat` (Windows CMD), using the same `docker-compose.yml` as Docker.
+Podman is supported by `./dev` (macOS/Linux) and `dev.bat` (Windows CMD), using the same `docker-compose.yml` as Docker.
 
 Install Podman and a Compose provider: either `podman-compose`, or a provider available through `podman compose`. The latter delegates to an external Compose tool; installing Podman alone does not supply Compose. See the [Podman Compose documentation](https://docs.podman.io/en/latest/markdown/podman-compose.1.html).
 
@@ -61,7 +61,7 @@ podman machine init   # First-time setup only
 podman machine start # If the machine is stopped
 ```
 
-From the project directory, follow [Quick Start](#quick-start), including `./sail ssl` (or `sail.bat ssl`) before starting the stack: the HTTPS proxy requires the generated certificates. Open [http://localhost:8080](http://localhost:8080) for HTTP; HTTPS uses port 8443 with a self-signed certificate.
+From the project directory, follow [Quick Start](#quick-start), including `./dev ssl` (or `dev.bat ssl`) before starting the stack: the HTTPS proxy requires the generated certificates. Open [http://localhost:8080](http://localhost:8080) for HTTP; HTTPS uses port 8443 with a self-signed certificate.
 
 Both launchers detect Compose commands in this order:
 
@@ -73,18 +73,18 @@ Both launchers detect Compose commands in this order:
 When both engines are installed, Podman takes priority. In the Bash launcher, you can explicitly select a command through the shell environment:
 
 ```bash
-DOCKER_COMPOSE="podman compose" ./sail up
-DOCKER_COMPOSE="docker compose" ./sail up
+DOCKER_COMPOSE="podman compose" ./dev up
+DOCKER_COMPOSE="docker compose" ./dev up
 ```
 
 In Windows CMD, select a command for the current session:
 
 ```cmd
 set "DOCKER_COMPOSE=podman compose"
-sail.bat up
+dev.bat up
 ```
 
-Use `set "DOCKER_COMPOSE="` to return to automatic detection. The variable keeps its historical name for both engines. Backup and restore commands launched through either Sail launcher inherit the selection.
+Use `set "DOCKER_COMPOSE="` to return to automatic detection. The variable keeps its historical name for both engines. Backup and restore commands launched through either Dev launcher inherit the selection.
 
 The default host ports (`APP_PORT=8080`, `SSL_PORT=8443`) avoid privileged ports for rootless Podman. Bind mounts include the shared SELinux label option (`:z`). Container startup, bind-mount write permissions, and Xdebug host connectivity should be verified on your target platform; these depend on the runtime and host configuration.
 
@@ -106,7 +106,7 @@ Edit the `.env` file to customize your setup:
 
 | Variable                  | Default | Description                             |
 | ------------------------- | ------- | --------------------------------------- |
-| `PHP_VERSION`             | `8.2`   | PHP version: 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5   |
+| `PHP_VERSION`             | `8.5`   | PHP version: 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5   |
 | `NODE_VERSION`            | `20`    | Node.js version                         |
 | `PHP_POST_MAX_SIZE`       | `100M`  | Maximum POST data size                  |
 | `PHP_UPLOAD_MAX_FILESIZE` | `100M`  | Maximum upload file size                |
@@ -116,14 +116,18 @@ Edit the `.env` file to customize your setup:
 
 ### App Image Base
 
+The default is **PHP 8.5**, the latest stable branch reviewed as of September 2026. PHP has no separate upstream LTS edition: its [support policy](https://www.php.net/supported-versions.php) provides two years of active support followed by two years of security support. PHP 8.5 has active support through December 31, 2027 and security support through December 31, 2029.
+
+The default stays on the explicit `8.5` branch to receive patch updates when the base image is refreshed, without silently moving to a future minor release. Existing `.env` files keep their selected version; set `PHP_VERSION=8.5` to opt in, then rebuild with `./dev build --pull app` and recreate with `./dev up --force-recreate app`.
+
 The app automatically selects an official Debian-based PHP-FPM image using `PHP_VERSION`:
 
 | PHP version | Debian base |
 |-------------|-------------|
 | 7.4, 8.0 | Bullseye (`php:<version>-fpm-bullseye`) |
-| 8.1, 8.2 (default), 8.3, 8.4, 8.5 | Bookworm Slim (`php:<version>-fpm-bookworm`) |
+| 8.1, 8.2, 8.3, 8.4, 8.5 (default) | Bookworm Slim (`php:<version>-fpm-bookworm`) |
 
-To use PHP 7.4, set `PHP_VERSION=7.4` in `.env`, then run `./sail build app` and `./sail up --force-recreate app` (or the equivalent `sail.bat` commands). No separate Debian setting is needed. Legacy PHP versions use archived images; compatibility here does not imply ongoing upstream security support. Bullseye package sources are pinned to Debian’s 2026-09-01 snapshot in `docker/php/bullseye-sources.list`, since the live security mirror can no longer serve all indexed packages.
+To use PHP 7.4, set `PHP_VERSION=7.4` in `.env`, then run `./dev build app` and `./dev up --force-recreate app` (or the equivalent `dev.bat` commands). No separate Debian setting is needed. Legacy PHP versions use archived images; compatibility here does not imply ongoing upstream security support. Bullseye package sources are pinned to Debian’s 2026-09-01 snapshot in `docker/php/bullseye-sources.list`, since the live security mirror can no longer serve all indexed packages.
 
 PHP extensions are installed with the version-pinned [PHP extension installer](https://github.com/mlocati/docker-php-extension-installer), which removes temporary build dependencies. PHP 7.4, 8.0, and 8.1 use explicitly selected compatible Xdebug versions. Node.js/npm are copied from the matching `node:${NODE_VERSION}-bookworm-slim` image. Composer, WP-CLI, Nginx, Supervisor, and Xdebug remain included.
 
@@ -132,22 +136,23 @@ CLI and FPM share `/usr/local/etc/php/conf.d/`. FPM configuration is in `/usr/lo
 Rebuild and recreate the app after switching from the Ubuntu image:
 
 ```bash
-./sail build app
-./sail up --force-recreate app
+./dev build app
+./dev up --force-recreate app
 ```
 
-To validate a standalone default build without starting databases or publishing ports:
+To check the default image version and FPM configuration without starting databases or publishing ports:
 
 ```bash
 docker build -t phplocaldocker-smoke docker/php
-bash tests/image-smoke.sh phplocaldocker-smoke docker 8.2
+docker run --rm --entrypoint php phplocaldocker-smoke -v
+docker run --rm --entrypoint php-fpm phplocaldocker-smoke -t
 
-# Validate the legacy PHP path too
+# Check the legacy PHP version too
 docker build --build-arg PHP_VERSION=7.4 -t phplocaldocker-smoke:7.4 docker/php
-bash tests/image-smoke.sh phplocaldocker-smoke:7.4 docker 7.4
+docker run --rm --entrypoint php phplocaldocker-smoke:7.4 -v
 ```
 
-For Podman, use `podman build` and pass `podman` as the test script's second argument. The test checks default PHP settings, extensions, development tools, and Nginx-to-FPM requests. Final image size depends on the selected versions and included tools.
+For Podman, replace `docker` with `podman` in these commands. Final image size depends on the selected versions and included tools.
 
 ### Database Settings
 
@@ -184,49 +189,49 @@ For Podman, use `podman build` and pass `podman` as the test script's second arg
 ### Container Management
 
 ```bash
-./sail up          # Start containers
-./sail down        # Stop containers
-./sail build       # Build containers
-./sail ps          # List running containers
-./sail logs        # View container logs
-./sail stop        # Stop containers
-./sail restart     # Restart containers
+./dev up          # Start containers
+./dev down        # Stop containers
+./dev build       # Build containers
+./dev ps          # List running containers
+./dev logs        # View container logs
+./dev stop        # Stop containers
+./dev restart     # Restart containers
 ```
 
 ### Development
 
 ```bash
-./sail shell       # Open bash shell in app container
-./sail php -v      # Run PHP commands
-./sail composer install    # Run Composer
-./sail artisan migrate     # Run Laravel Artisan
-./sail wp plugin list      # Run WP-CLI
+./dev shell       # Open bash shell in app container
+./dev php -v      # Run PHP commands
+./dev composer install    # Run Composer
+./dev artisan migrate     # Run Laravel Artisan
+./dev wp plugin list      # Run WP-CLI
 ```
 
 ### Database
 
 ```bash
-./sail mysql       # Open MySQL CLI
-./sail psql        # Open PostgreSQL CLI
-./sail redis       # Open Redis CLI
+./dev mysql       # Open MySQL CLI
+./dev psql        # Open PostgreSQL CLI
+./dev redis       # Open Redis CLI
 ```
 
 ### Backup &amp; Restore
 
 ```bash
-./sail backup                          # Backup all databases
-./sail restore --list                  # List available backups
-./sail restore <mysql> <postgres>      # Restore both databases
-./sail restore --mysql <file>          # Restore MySQL only
-./sail restore --postgres <file>       # Restore PostgreSQL only
+./dev backup                          # Backup all databases
+./dev restore --list                  # List available backups
+./dev restore <mysql> <postgres>      # Restore both databases
+./dev restore --mysql <file>          # Restore MySQL only
+./dev restore --postgres <file>       # Restore PostgreSQL only
 ```
 
 **Windows (CMD):**
 
 ```cmd
-sail.bat backup
-sail.bat restore --list
-sail.bat restore myapp_mysql_20240115_120000.sql myapp_postgres_20240115_120000.sql
+dev.bat backup
+dev.bat restore --list
+dev.bat restore myapp_mysql_20240115_120000.sql myapp_postgres_20240115_120000.sql
 ```
 
 Backups are stored in the `backups/` directory with timestamps in the format:
@@ -237,9 +242,9 @@ Backups are stored in the `backups/` directory with timestamps in the format:
 ### Utilities
 
 ```bash
-./sail ssl         # Generate SSL certificates
-./sail mailpit     # View Mailpit logs
-./sail help        # Show all commands
+./dev ssl         # Generate SSL certificates
+./dev mailpit     # View Mailpit logs
+./dev help        # Show all commands
 ```
 
 ## Services
@@ -303,7 +308,7 @@ HTTPS termination at host port 8443 (`SSL_PORT`), proxies to app container.
 Generate self-signed SSL certificates:
 
 ```bash
-./sail ssl
+./dev ssl
 ```
 
 Then trust the certificate on your system:
@@ -334,7 +339,7 @@ Import-Certificate -FilePath "docker\ssl\certs\myapp.test.crt" -CertStoreLocatio
 1. Create new project:
 
 ```bash
-./sail composer create-project laravel/laravel .
+./dev composer create-project laravel/laravel .
 ```
 
 2. Configure `.env`:
@@ -361,7 +366,7 @@ MAIL_PORT=1025
 1. Download WordPress:
 
 ```bash
-./sail wp core download
+./dev wp core download
 ```
 
 2. Configure `wp-config.php`:
@@ -376,7 +381,7 @@ define('DB_HOST', 'mysql');
 ### Zend / Laminas
 
 ```bash
-./sail composer create-project laminas/laminas-mvc-skeleton .
+./dev composer create-project laminas/laminas-mvc-skeleton .
 ```
 
 ## Platform-Specific Notes
@@ -385,7 +390,7 @@ define('DB_HOST', 'mysql');
 
 - Use Docker Desktop or Podman with a running Podman machine (see [Podman Support](#podman-support))
 - File system performance is optimized by default
-- Use `./sail` for all commands
+- Use `./dev` for all commands
 
 ### Linux
 
@@ -399,41 +404,41 @@ sudo usermod -aG docker $USER
 ### Windows
 
 - Use Docker Desktop with WSL2 backend or Podman with a running Podman machine
-- Use `sail.bat` in CMD
-- Or use `./sail` inside WSL with the chosen engine configured there
+- Use `dev.bat` in CMD
+- Or use `./dev` inside WSL with the chosen engine configured there
 
 ## Troubleshooting
 
 ### Compose Fallback
 
-If the `sail` script fails due to environment issues (like line ending conflicts or missing shell permissions), you can use native Compose commands. For Podman, replace `docker compose` below with `podman-compose` or `podman compose`:
+If the `dev` script fails due to environment issues (like line ending conflicts or missing shell permissions), you can use native Compose commands. For Podman, replace `docker compose` below with `podman-compose` or `podman compose`:
 
 
-| Sail Command          | Docker Compose Equivalent                                                                                                                                                                                 |
+| Dev Command          | Docker Compose Equivalent                                                                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `./sail up`           | `docker compose up -d`                                                                                                                                                                                    |
-| `./sail down`         | `docker compose down`                                                                                                                                                                                     |
-| `./sail build`        | `docker compose build --build-arg WWWGROUP=$(id -g) --build-arg PHP_POST_MAX_SIZE=100M --build-arg PHP_UPLOAD_MAX_FILESIZE=100M --build-arg PHP_MAX_EXECUTION_TIME=300 --build-arg PHP_SHORT_OPEN_TAG=On` |
-| `./sail ps`           | `docker compose ps`                                                                                                                                                                                       |
-| `./sail logs`         | `docker compose logs -f`                                                                                                                                                                                  |
-| `./sail shell`        | `docker compose exec app bash`                                                                                                                                                                            |
-| `./sail php ...`      | `docker compose exec app php ...`                                                                                                                                                                         |
-| `./sail composer ...` | `docker compose exec app composer ...`                                                                                                                                                                    |
-| `./sail artisan ...`  | `docker compose exec app php artisan ...`                                                                                                                                                                 |
-| `./sail wp ...`       | `docker compose exec app wp ...`                                                                                                                                                                          |
+| `./dev up`           | `docker compose up -d`                                                                                                                                                                                    |
+| `./dev down`         | `docker compose down`                                                                                                                                                                                     |
+| `./dev build`        | `docker compose build --build-arg WWWGROUP=$(id -g) --build-arg PHP_POST_MAX_SIZE=100M --build-arg PHP_UPLOAD_MAX_FILESIZE=100M --build-arg PHP_MAX_EXECUTION_TIME=300 --build-arg PHP_SHORT_OPEN_TAG=On` |
+| `./dev ps`           | `docker compose ps`                                                                                                                                                                                       |
+| `./dev logs`         | `docker compose logs -f`                                                                                                                                                                                  |
+| `./dev shell`        | `docker compose exec app bash`                                                                                                                                                                            |
+| `./dev php ...`      | `docker compose exec app php ...`                                                                                                                                                                         |
+| `./dev composer ...` | `docker compose exec app composer ...`                                                                                                                                                                    |
+| `./dev artisan ...`  | `docker compose exec app php artisan ...`                                                                                                                                                                 |
+| `./dev wp ...`       | `docker compose exec app wp ...`                                                                                                                                                                          |
 
 
 ### Script Permissions &amp; Line Endings
 
-If you encounter `Permission denied` or `Command not found` when running `./sail`:
+If you encounter `Permission denied` or `Command not found` when running `./dev`:
 
 ```bash
 # Fix execution permissions
-chmod +x sail docker/scripts/*.sh docker/ssl/*.sh docker/php/start-container
+chmod +x dev docker/scripts/*.sh docker/ssl/*.sh docker/php/start-container
 
 # If scripts have Windows (CRLF) line endings on Linux/macOS
 # You can fix them using the 'tr' command:
-tr -d '\r' < sail > sail.tmp && mv sail.tmp sail && chmod +x sail
+tr -d '\r' < dev > dev.tmp && mv dev.tmp dev && chmod +x dev
 ```
 
 ### Port Already in Use
@@ -453,9 +458,9 @@ APP_PORT=8082
 Reset MySQL data:
 
 ```bash
-./sail down
+./dev down
 docker volume rm phplocaldocker_sail-mysql
-./sail up
+./dev up
 ```
 
 ### PHP-FPM Not Starting
@@ -463,14 +468,14 @@ docker volume rm phplocaldocker_sail-mysql
 Check container logs:
 
 ```bash
-./sail shell
+./dev shell
 php-fpm -t
 ```
 
 ### Clear All Docker Data
 
 ```bash
-./sail down -v  # Remove containers and volumes
+./dev down -v  # Remove containers and volumes
 docker system prune -a  # Clean all unused Docker resources
 ```
 
@@ -482,8 +487,8 @@ docker system prune -a  # Clean all unused Docker resources
 ├── .gitignore              # Git ignore rules
 ├── .dockerignore           # Docker build ignore rules
 ├── docker-compose.yml      # Docker services definition
-├── sail                    # CLI tool (macOS/Linux)
-├── sail.bat                # CLI tool (Windows)
+├── dev                    # CLI tool (macOS/Linux)
+├── dev.bat                # CLI tool (Windows)
 ├── SECURITY.md             # Security guidelines
 ├── public/                 # Web root
 │   └── index.php

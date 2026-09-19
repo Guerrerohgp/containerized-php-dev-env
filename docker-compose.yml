@@ -5,9 +5,9 @@ services:
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP:-1000}'
-                PHP_VERSION: '${PHP_VERSION:-8.2}'
+                PHP_VERSION: '${PHP_VERSION:-8.5}'
                 NODE_VERSION: '${NODE_VERSION:-20}'
-        image: sail-${PHP_VERSION:-8.2}/app
+        image: sail-${PHP_VERSION:-8.5}/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
