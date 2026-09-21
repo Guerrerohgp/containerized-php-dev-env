@@ -97,3 +97,8 @@ venv/
 # Docker volumes backup
 *.tar
 *.tar.gz
+
+# Application secrets at any depth
+**/.env
+**/.env.*
+!**/.env.example

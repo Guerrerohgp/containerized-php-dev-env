@@ -27,24 +27,16 @@ A generic, configurable Docker and Podman development environment for PHP projec
 git clone https://github.com/Guerrerohgp/containerized-php-dev-env.git my-project
 cd my-project
 
-# 2. Create environment file
-cp .env.example .env
-
-# 3. Build and start containers
-./dev build
-./dev ssl
+# 2. Initialize and start (creates .env, src/, and local SSL certificates)
 ./dev up
 
-# 4. Open in browser
+# 3. Open in browser
 open http://localhost:8080
 ```
 
 **Windows (CMD):**
 
 ```cmd
-copy .env.example .env
-dev.bat build
-dev.bat ssl
 dev.bat up
 ```
 
@@ -61,7 +53,7 @@ podman machine init   # First-time setup only
 podman machine start # If the machine is stopped
 ```
 
-From the project directory, follow [Quick Start](#quick-start), including `./dev ssl` (or `dev.bat ssl`) before starting the stack: the HTTPS proxy requires the generated certificates. Open [http://localhost:8080](http://localhost:8080) for HTTP; HTTPS uses port 8443 with a self-signed certificate.
+From the project directory, follow [Quick Start](#quick-start). `./dev up` (or `dev.bat up`) generates missing certificates before starting the stack. Open [http://localhost:8080](http://localhost:8080) for HTTP; HTTPS uses port 8443 with a self-signed certificate.
 
 Both launchers detect Compose commands in this order:
 
@@ -334,6 +326,37 @@ Import-Certificate -FilePath "docker\ssl\certs\myapp.test.crt" -CertStoreLocatio
 
 ## Framework Setup
 
+### Application directory
+
+Application code belongs in `src/`, mounted at `/var/www/html`. Keep the root
+`.env` for container configuration and `src/.env` for application configuration.
+Composer, PHP, Artisan, WP-CLI, and the shell all work inside `src/`.
+`src/` is created at startup and contains no placeholder files.
+
+`./dev up` creates missing configuration and certificates, and Compose builds
+missing images. Docker/Podman, its Compose provider, and OpenSSL must be installed.
+Existing files are preserved. On Linux/macOS, a newly created root `.env` uses
+the invoking user's UID/GID; review `WWWUSER` and `WWWGROUP` in existing setups.
+Application commands and PHP-FPM run as that container user.
+
+The web root is selected at startup and after successful Composer and WP-CLI commands:
+`public/`, then `web/`, then `src/` if it has `index.php` or `index.html`.
+Otherwise a welcome page outside the application directory is shown.
+Set `APP_DOCUMENT_ROOT` in the root `.env` to override this with a path relative
+to `src/` (use `.` for the application root), then run `./dev up` again.
+For files copied manually or downloaded outside these commands, run `./dev restart app` to detect the new layout.
+
+This layout supports one application per checkout. Use `.` as the Composer
+project destination; the common `create-project PACKAGE` form defaults to `.`
+as well. Explicit destinations and Composer options are preserved. A failed
+installation preserves Composer's error code and files for inspection; existing
+application files are never automatically removed or merged.
+
+For an existing checkout, move your application files into `src/` yourself,
+leaving `dev`, `dev.bat`, `docker/`, `docker-compose.yml`, and the environment's
+root `.env` in place. Rebuild the updated image with `./dev build`, then
+`./dev up`. The old root `public/index.php` placeholder is no longer served.
+
 ### Laravel
 
 1. Create new project:
@@ -342,7 +365,9 @@ Import-Certificate -FilePath "docker\ssl\certs\myapp.test.crt" -CertStoreLocatio
 ./dev composer create-project laravel/laravel .
 ```
 
-2. Configure `.env`:
+2. Laravel can use its generated SQLite defaults immediately. To use the bundled
+MySQL, Redis, and mail services, configure `src/.env` with credentials matching
+the root `.env`:
 
 ```env
 DB_CONNECTION=mysql
@@ -351,7 +376,7 @@ DB_DATABASE=myapp
 DB_USERNAME=myapp
 DB_PASSWORD=secret
 
-CACHE_DRIVER=redis
+CACHE_STORE=redis
 QUEUE_CONNECTION=redis
 SESSION_DRIVER=redis
 REDIS_HOST=redis
@@ -369,7 +394,9 @@ MAIL_PORT=1025
 ./dev wp core download
 ```
 
-2. Configure `wp-config.php`:
+The web root refreshes automatically after the download; no restart is needed.
+
+2. Configure `src/wp-config.php`:
 
 ```php
 define('DB_NAME', 'myapp');
@@ -490,8 +517,7 @@ docker system prune -a  # Clean all unused Docker resources
 ├── dev                    # CLI tool (macOS/Linux)
 ├── dev.bat                # CLI tool (Windows)
 ├── SECURITY.md             # Security guidelines
-├── public/                 # Web root
-│   └── index.php
+├── src/                    # Application code (created by ./dev up)
 ├── backups/                # Database backups (auto-created)
 └── docker/
     ├── mysql/

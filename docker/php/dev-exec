@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -e
+exec runuser -u sail -- env HOME=/home/sail "$@"

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+# Keep explicit destinations and options intact. Only supply the omitted
+# destination for the common create-project PACKAGE invocation.
+args=("$@")
+if [ "${1:-}" = create-project ]; then
+    positional=0
+    skip=false
+    literal=false
+    understood=true
+    for arg in "${@:2}"; do
+        if $skip; then skip=false; continue; fi
+        if $literal; then positional=$((positional + 1)); continue; fi
+        case "$arg" in
+            --) literal=true ;;
+            --stability|--prefer-install|--repository|--repository-url|--require|--ignore-platform-req|--audit-format|-s) skip=true ;;
+            --*=*|--add-repository|--prefer-source|--prefer-dist|--dev|--no-dev|--no-custom-installers|--no-scripts|--no-progress|--no-secure-http|--keep-vcs|--remove-vcs|--no-install|--no-audit|--no-security-blocking|--no-blocking|--ignore-platform-reqs|--ask|--no-interaction|-n|--quiet|-q|--verbose|-v|-vv|-vvv|--ansi|--no-ansi|--no-plugins|--no-cache) ;;
+            -*) understood=false ;;
+            *) positional=$((positional + 1)) ;;
+        esac
+    done
+    if $understood && ! $skip && [ "$positional" = 1 ]; then
+        echo "Installing into src/ (default project destination)."
+        args+=(.)
+    fi
+fi
+dev-exec composer "${args[@]}"
+configure-web

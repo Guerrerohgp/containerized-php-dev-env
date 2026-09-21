@@ -1,5 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
+cd /d "%~dp0"
+if "%1"=="up" (
+    if not exist .env copy .env.example .env >nul
+    if not exist src mkdir src
+)
 
 if defined DOCKER_COMPOSE goto compose_ready
 where podman-compose >nul 2>nul
@@ -55,6 +60,10 @@ set PROJECT_DOMAIN=%PROJECT_DOMAIN%
 if "%PROJECT_DOMAIN%"=="" set PROJECT_DOMAIN=myapp.test
 
 if "%1"=="up" (
+    if not exist docker\ssl\certs\server.crt call docker\ssl\generate-certs.bat
+    if errorlevel 1 exit /b 1
+    if not exist docker\ssl\certs\server.key call docker\ssl\generate-certs.bat
+    if errorlevel 1 exit /b 1
     set "SAIL_RUN=%DOCKER_COMPOSE% up -d"
     goto forward_arguments
 )
@@ -76,11 +85,11 @@ if "%1"=="ps" (
     goto forward_arguments
 )
 if "%1"=="shell" (
-    %DOCKER_COMPOSE% exec app bash
+    %DOCKER_COMPOSE% exec app dev-exec bash
     goto end
 )
 if "%1"=="bash" (
-    %DOCKER_COMPOSE% exec app bash
+    %DOCKER_COMPOSE% exec app dev-exec bash
     goto end
 )
 if "%1"=="logs" (
@@ -88,19 +97,19 @@ if "%1"=="logs" (
     goto forward_arguments
 )
 if "%1"=="wp" (
-    set "SAIL_RUN=%DOCKER_COMPOSE% exec app wp"
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app dev-wp"
     goto forward_arguments
 )
 if "%1"=="composer" (
-    set "SAIL_RUN=%DOCKER_COMPOSE% exec app composer"
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app dev-composer"
     goto forward_arguments
 )
 if "%1"=="artisan" (
-    set "SAIL_RUN=%DOCKER_COMPOSE% exec app php artisan"
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app dev-exec php artisan"
     goto forward_arguments
 )
 if "%1"=="php" (
-    set "SAIL_RUN=%DOCKER_COMPOSE% exec app php"
+    set "SAIL_RUN=%DOCKER_COMPOSE% exec app dev-exec php"
     goto forward_arguments
 )
 if "%1"=="mysql" (
@@ -155,8 +164,7 @@ set SAIL_ARGS=%SAIL_ARGS% %1
 goto collect_arguments
 :run_command
 %SAIL_RUN% %SAIL_ARGS%
-endlocal
-goto end
+exit /b %errorlevel%
 
 :help
 echo Dev - Docker and Podman management for PHP projects

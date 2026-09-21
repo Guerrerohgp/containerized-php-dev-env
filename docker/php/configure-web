@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -e
+root=/var/www/html
+if [ -n "${APP_DOCUMENT_ROOT:-}" ]; then
+    case "$APP_DOCUMENT_ROOT" in
+        *..*|*[!a-zA-Z0-9_./-]*) echo "Invalid APP_DOCUMENT_ROOT" >&2; exit 1 ;;
+    esac
+    root="/var/www/html/${APP_DOCUMENT_ROOT#/}"
+elif [ -d /var/www/html/public ]; then
+    root=/var/www/html/public
+elif [ -d /var/www/html/web ]; then
+    root=/var/www/html/web
+elif [ ! -f /var/www/html/index.php ] && [ ! -f /var/www/html/index.html ]; then
+    root=/var/www/welcome
+fi
+sed -i "s|^    root .*;|    root $root;|" /etc/nginx/sites-available/default
+nginx -t
+if [ -s /run/nginx.pid ]; then nginx -s reload; fi
