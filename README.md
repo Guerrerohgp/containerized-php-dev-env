@@ -47,6 +47,17 @@ Podman is supported by `./dev` (macOS/Linux) and `dev.bat` (Windows CMD), using 
 
 Install Podman and a Compose provider: either `podman-compose`, or a provider available through `podman compose`. The latter delegates to an external Compose tool; installing Podman alone does not supply Compose. See the [Podman Compose documentation](https://docs.podman.io/en/latest/markdown/podman-compose.1.html).
 
+On Linux, `./dev` automatically applies `docker-compose.podman.yml` when the selected provider is `podman-compose` or `podman compose` and Podman is rootless. This maps your host user to the configured `WWWUSER`/`WWWGROUP` inside the app container, so Composer and PHP can write to `src/` without changing host ownership. Keep `src/` writable by the user running Podman.
+
+If upgrading an existing rootless setup after a Composer permission error, recreate the app container before retrying:
+
+```bash
+./dev up --force-recreate app
+./dev composer create-project laravel/laravel .
+```
+
+If you run Compose directly or use a custom provider wrapper, include the override explicitly: `podman compose -f docker-compose.yml -f docker-compose.podman.yml up -d --force-recreate app`. Use this override only with rootless Podman. If the failed installation left files in `src/`, inspect them before retrying; Composer requires an empty destination for `create-project`.
+
 On macOS and Windows, create a [Podman machine](https://docs.podman.io/en/latest/markdown/podman-machine-init.1.html) if you do not already have one, then start it:
 
 ```bash

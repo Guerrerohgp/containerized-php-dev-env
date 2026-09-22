@@ -103,6 +103,21 @@ case "$lite" in
         ;;
 esac
 
+# Rootless Podman's default namespace maps the host owner to container root,
+# not to sail. Keep the caller mapped to the configured PHP user instead.
+compose_executable="${DOCKER_COMPOSE%% *}"
+case "${compose_executable##*/}" in
+    podman|podman-compose)
+        if [ "$(uname -s)" = Linux ]; then
+            podman_rootless=$(podman info --format '{{.Host.Security.Rootless}}')
+            if [ "$podman_rootless" = true ]; then
+                compose_separator="${COMPOSE_PATH_SEPARATOR:-:}"
+                export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}${compose_separator}docker-compose.podman.yml"
+            fi
+        fi
+        ;;
+esac
+
 PROJECT_NAME="${PROJECT_NAME:-myapp}"
 PROJECT_DOMAIN="${PROJECT_DOMAIN:-myapp.test}"
 
