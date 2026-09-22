@@ -11,12 +11,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipIf(os.name == 'nt', 'Bash startup helper')
 class WebPortTests(unittest.TestCase):
-    def launch(self, mode, answers=None):
+    def launch(self, mode, answers=None, rootless=None, minimum=1024):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             initial = '# keep me\nAPP_PORT=80\nSSL_PORT=443\nOTHER=value\n'
             (root / '.env').write_text(initial)
-            provider = root / 'compose'
+            provider = root / ('podman-compose' if rootless is not None else 'compose')
+            (root / 'calls').touch()
             provider.write_text('''#!/bin/sh
 printf '%s %s\\n' "$APP_PORT" "$SSL_PORT" >> calls
 if [ "$MODE" = unrelated ]; then echo 'image download failed'; exit 7; fi
@@ -31,6 +32,12 @@ exit 0
             provider.chmod(0o755)
             env = dict(os.environ, DOCKER_COMPOSE=str(provider), MODE=mode,
                        APP_PORT='80', SSL_PORT='443', PROJECT_DOMAIN='myapp.test')
+            if rootless is not None:
+                for name, output in [('uname', 'Linux'), ('podman', str(rootless).lower()), ('sysctl', str(minimum))]:
+                    stub = root / name
+                    stub.write_text(f'#!/bin/sh\necho {output}\n')
+                    stub.chmod(0o755)
+                env['PATH'] = str(root) + os.pathsep + env['PATH']
             command = ['bash', str(ROOT / 'docker/scripts/up.sh')]
             if answers is None:
                 result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=10)
@@ -47,6 +54,37 @@ exit 0
                     os.close(master)
                     os.close(slave)
             return result, initial, (root / '.env').read_text(), (root / 'calls').read_text()
+
+    def test_rootless_prompts_before_compose_and_saves_after_success(self):
+        result, initial, saved, calls = self.launch('success', '81\n\n\n', rootless=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('this host requires ports >= 1024', result.stdout)
+        self.assertIn('Replacement for APP_PORT', result.stderr)
+        self.assertIn('Replacement for SSL_PORT', result.stderr)
+        self.assertEqual(calls, '8080 8443\n')
+        self.assertEqual(saved, initial.replace('APP_PORT=80', 'APP_PORT=8080').replace('SSL_PORT=443', 'SSL_PORT=8443'))
+
+    def test_rootless_cancel_and_noninteractive_do_not_start_containers(self):
+        for answers in (None, 'q\n', '\nq\n'):
+            with self.subTest(answers=answers):
+                result, initial, saved, calls = self.launch('success', answers, rootless=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(saved, initial)
+                self.assertEqual(calls, '')
+
+    def test_rootful_or_permitted_ports_do_not_prompt(self):
+        for rootless, minimum in [(False, 1024), (True, 80)]:
+            with self.subTest(rootless=rootless, minimum=minimum):
+                result, initial, saved, calls = self.launch('success', rootless=rootless, minimum=minimum)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(saved, initial)
+                self.assertEqual(calls, '80 443\n')
+
+    def test_rootless_choices_are_not_saved_if_startup_fails(self):
+        result, initial, saved, calls = self.launch('unrelated', '\n\n', rootless=True)
+        self.assertEqual(result.returncode, 7)
+        self.assertEqual(saved, initial)
+        self.assertEqual(calls, '8080 8443\n')
 
     def test_standard_ports_no_prompt_or_env_rewrite(self):
         result, initial, saved, calls = self.launch('success')

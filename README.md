@@ -550,7 +550,7 @@ tr -d '\r' < dev > dev.tmp && mv dev.tmp dev && chmod +x dev
 
 New setups default to `APP_PORT=80` and `SSL_PORT=443`, so HTTP and HTTPS URLs need no port suffix. Existing `.env` files keep their values; change them to `80` and `443` if you want the new defaults.
 
-`./dev up` and `dev.bat up` try your configured ports first. If Docker or Podman reports a recognized binding conflict or permission error for a web port, the launcher asks for a replacement, suggesting `8080` for HTTP or `8443` for HTTPS. Enter another port, accept the suggestion with Enter, or enter `q` to cancel. Each retry checks availability through the container engine. Accepted changes are saved to `.env` only after startup succeeds.
+`./dev up` checks Linux rootless Podman’s minimum allowed port before starting containers. If a configured web port is below that limit, it asks for a replacement or lets you cancel. Otherwise, `./dev up` and `dev.bat up` try your configured ports first. If Docker or Podman reports a recognized binding conflict or permission error for a web port, the launcher asks for a replacement, suggesting `8080` for HTTP or `8443` for HTTPS. Enter another port, accept the suggestion with Enter, or enter `q` to cancel. Each retry checks availability through the container engine. Accepted changes are saved to `.env` only after startup succeeds.
 
 Non-interactive runs exit with an error and instructions to edit `.env`; they never accept a fallback automatically. Other startup failures are returned without prompting. A failed startup may have already started other services. The launcher does not stop unrelated containers or change host privileged-port permissions.
 
