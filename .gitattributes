@@ -4,8 +4,24 @@
 # Shell scripts should always use LF
 *.sh text eol=lf
 dev text eol=lf
+
+# Docker PHP container scripts (no .sh extension) — must use LF inside Linux
 docker/php/start-container text eol=lf
+docker/php/configure-web text eol=lf
+docker/php/dev-exec text eol=lf
+docker/php/dev-composer text eol=lf
+docker/php/dev-wp text eol=lf
 docker/php/lite/** text eol=lf
+
+# Dockerfiles and container config files — must use LF
+docker/php/Dockerfile text eol=lf
+docker/php/Dockerfile.lite text eol=lf
+docker/php/supervisord.conf text eol=lf
+docker/php/fpm-env.conf text eol=lf
+docker/php/nginx-default text eol=lf
+docker/php/php.ini text eol=lf
+docker/php/xdebug.ini text eol=lf
+docker/ssl/nginx.conf text eol=lf
 
 # Batch files should always use CRLF
 *.bat text eol=crlf
