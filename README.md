@@ -19,7 +19,7 @@ A generic, configurable Docker and Podman development environment for PHP projec
 ## Requirements
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS/Windows) or Docker Engine (Linux), with Docker Compose v2.0+; **or [Podman](https://podman.io/) with a Compose provider** (see [Podman Support](#podman-support))
-- Ports 8080, 8081, 8443, 3306, 5432, 6379, 1025, 8025 available by default
+- Ports 80, 8081, 443, 3306, 5432, 6379, 1025, 8025 available by default
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ cd my-project
 ./dev up
 
 # 3. Open in browser
-open http://localhost:8080
+open http://localhost
 ```
 
 **Windows (CMD):**
@@ -40,6 +40,36 @@ open http://localhost:8080
 ```cmd
 dev.bat up
 ```
+
+## Local Domain
+
+Set `PROJECT_DOMAIN=myapp.test` in `.env`, then add the local hosts entry:
+
+```bash
+./dev hosts
+./dev up
+```
+
+The hosts helper is implemented for **macOS, Linux, and Windows**:
+
+| Platform / shell | Command | Permissions |
+| --- | --- | --- |
+| macOS | `./dev hosts` | Requests `sudo` when an edit is needed |
+| Linux | `./dev hosts` | Requests `sudo` when an edit is needed |
+| Windows CMD | `dev.bat hosts` | Open the terminal **as Administrator** |
+| Windows PowerShell | `.\dev.bat hosts` | Open the terminal **as Administrator** |
+
+macOS/Linux update `/etc/hosts`; Windows updates `%SystemRoot%\System32\drivers\etc\hosts` using the bundled PowerShell helper. No running container engine is needed to add the entry.
+
+You can also specify a domain: `./dev hosts example.test` or `dev.bat hosts example.test`.
+
+Validation: the helper has been tested on macOS against temporary hosts files. Direct Linux and Windows execution has not yet been verified.
+
+The command maps the domain to `127.0.0.1`. Open **http://myapp.test**, using your configured `PROJECT_DOMAIN`. If `APP_PORT` is not `80`, include it in the URL, for example `http://myapp.test:8080`. Containers must run on this computer, or have their ports forwarded here. When using an Arch VM, running the command inside the VM changes resolution only inside that VM.
+
+The helper preserves existing entries, saves a backup beside the hosts file, and skips an entry already pointing to localhost. A conflicting address produces an error for you to resolve manually. To undo an entry, remove its `127.0.0.1 <domain> # Added by dev hosts` line with administrator privileges. An explicit domain argument adds an alias; it does not change `.env` or SSL certificates.
+
+Hosts files map names to addresses, not ports. For HTTPS, use the configured `SSL_PORT` (default `443`) and generate/trust a certificate for that domain separately. Prefer a `.test` domain for local development.
 
 ## Podman Support
 
@@ -65,7 +95,7 @@ podman machine init   # First-time setup only
 podman machine start # If the machine is stopped
 ```
 
-From the project directory, follow [Quick Start](#quick-start). `./dev up` (or `dev.bat up`) generates missing certificates before starting the stack. Open [http://localhost:8080](http://localhost:8080) for HTTP; HTTPS uses port 8443 with a self-signed certificate.
+From the project directory, follow [Quick Start](#quick-start). `./dev up` (or `dev.bat up`) generates missing certificates before starting the stack. Open [http://localhost](http://localhost) for HTTP; HTTPS uses port 443 with a self-signed certificate.
 
 Both launchers detect Compose commands in this order:
 
@@ -90,7 +120,7 @@ dev.bat up
 
 Use `set "DOCKER_COMPOSE="` to return to automatic detection. The variable keeps its historical name for both engines. Backup and restore commands launched through either Dev launcher inherit the selection.
 
-The default host ports (`APP_PORT=8080`, `SSL_PORT=8443`) avoid privileged ports for rootless Podman. Bind mounts include the shared SELinux label option (`:z`). Container startup, bind-mount write permissions, and Xdebug host connectivity should be verified on your target platform; these depend on the runtime and host configuration.
+The default host ports are `APP_PORT=80` and `SSL_PORT=443`. Rootless Podman may lack permission to bind them; the launcher offers replacement ports when startup reports a web-port binding failure. Bind mounts include the shared SELinux label option (`:z`). Container startup, bind-mount write permissions, and Xdebug host connectivity should be verified on your target platform; these depend on the runtime and host configuration.
 
 ## Configuration
 
@@ -214,8 +244,8 @@ For Podman, replace `docker build` with `podman build` and add `--engine podman`
 
 | Service      | Default Port | Env Variable                     |
 | ------------ | ------------ | -------------------------------- |
-| HTTP         | 8080         | `APP_PORT`                       |
-| HTTPS        | 8443         | `SSL_PORT`                       |
+| HTTP         | 80           | `APP_PORT`                       |
+| HTTPS        | 443          | `SSL_PORT`                       |
 | HMR          | 8081         | `HMR_PORT`                       |
 | MySQL        | 3306         | `FORWARD_DB_PORT`                |
 | PostgreSQL   | 5432         | `FORWARD_POSTGRES_PORT`          |
@@ -341,7 +371,7 @@ Email testing tool with web UI at [http://localhost:8025](http://localhost:8025)
 
 ### SSL Proxy (`ssl-proxy`)
 
-HTTPS termination at host port 8443 (`SSL_PORT`), proxies to app container.
+HTTPS termination at host port 443 (`SSL_PORT`), proxies to app container.
 
 ## SSL Certificates
 
@@ -516,17 +546,22 @@ chmod +x dev docker/scripts/*.sh docker/ssl/*.sh docker/php/start-container
 tr -d '\r' < dev > dev.tmp && mv dev.tmp dev && chmod +x dev
 ```
 
-### Port Already in Use
+### Web Port Conflicts or Permission Errors
 
-If the default HTTP port 8080 is already in use:
+New setups default to `APP_PORT=80` and `SSL_PORT=443`, so HTTP and HTTPS URLs need no port suffix. Existing `.env` files keep their values; change them to `80` and `443` if you want the new defaults.
 
-```bash
-# Check what's using port 8080
-lsof -i :8080
+`./dev up` and `dev.bat up` try your configured ports first. If Docker or Podman reports a recognized binding conflict or permission error for a web port, the launcher asks for a replacement, suggesting `8080` for HTTP or `8443` for HTTPS. Enter another port, accept the suggestion with Enter, or enter `q` to cancel. Each retry checks availability through the container engine. Accepted changes are saved to `.env` only after startup succeeds.
 
-# Change port in .env
-APP_PORT=8082
+Non-interactive runs exit with an error and instructions to edit `.env`; they never accept a fallback automatically. Other startup failures are returned without prompting. A failed startup may have already started other services. The launcher does not stop unrelated containers or change host privileged-port permissions.
+
+For an unattended setup, configure available ports before starting:
+
+```env
+APP_PORT=8080
+SSL_PORT=8443
 ```
+
+Then open `http://myapp.test:8080` (after `./dev hosts`) and use `https://myapp.test:8443` for HTTPS. A port suffix is necessary whenever a fallback port is selected.
 
 ### MySQL Access Denied
 

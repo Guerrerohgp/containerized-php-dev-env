@@ -6,6 +6,7 @@ if "%1"=="up" (
     if not exist src mkdir src
 )
 
+if "%~1"=="hosts" goto compose_ready
 if defined DOCKER_COMPOSE goto compose_ready
 where podman-compose >nul 2>nul
 if %errorlevel% equ 0 (
@@ -54,6 +55,18 @@ if exist .env (
     )
 )
 
+if "%~1"=="hosts" (
+    if not "%~3"=="" (
+        echo Usage: dev.bat hosts [domain]
+        exit /b 1
+    )
+    set "DEV_HOST_DOMAIN=%~2"
+    if not defined DEV_HOST_DOMAIN set "DEV_HOST_DOMAIN=!PROJECT_DOMAIN!"
+    if not defined DEV_HOST_DOMAIN set "DEV_HOST_DOMAIN=myapp.test"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0docker\scripts\hosts.ps1" -Domain "!DEV_HOST_DOMAIN!"
+    exit /b !errorlevel!
+)
+
 rem A shell-provided mode takes precedence over the .env default.
 if defined DEV_LITE_OVERRIDE set "lite=%DEV_LITE_OVERRIDE%"
 if not defined lite set "lite=false"
@@ -82,7 +95,7 @@ if "%1"=="up" (
     if errorlevel 1 exit /b 1
     if not exist docker\ssl\certs\server.key call docker\ssl\generate-certs.bat
     if errorlevel 1 exit /b 1
-    set "SAIL_RUN=%DOCKER_COMPOSE% up -d"
+    set "SAIL_RUN=powershell.exe -NoProfile -ExecutionPolicy Bypass -File docker\scripts\up.ps1"
     goto forward_arguments
 )
 if "%1"=="down" (
@@ -206,6 +219,7 @@ echo   redis       Open Redis CLI
 echo   mailpit     Show Mailpit logs
 echo   stop        Stop the containers
 echo   restart     Restart the containers
+echo   hosts       Add a local domain to the hosts file
 echo   ssl         Generate SSL certificates
 echo   backup      Backup all databases
 echo   restore     Restore databases

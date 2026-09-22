@@ -131,6 +131,9 @@ sys.exit(int(os.environ.get('COMPOSER_STATUS', '0')) if sys.argv[0].endswith('de
     def test_first_up_is_repeatable_and_src_empty(self):
         shutil.copy(ROOT / 'dev', self.work / 'dev')
         shutil.copy(ROOT / '.env.example', self.work / '.env.example')
+        scripts = self.work / 'docker/scripts'
+        scripts.mkdir(parents=True)
+        shutil.copy(ROOT / 'docker/scripts/up.sh', scripts / 'up.sh')
         certs = self.work / 'docker/ssl/certs'
         certs.mkdir(parents=True)
         generator = certs.parent / 'generate-certs.sh'
