@@ -58,6 +58,31 @@ sys.exit(int(os.environ.get('COMPOSER_STATUS', '0')) if sys.argv[0].endswith('de
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.calls(), [['compose', 'exec', '-T', 'app', 'dev-wp', 'core', 'download']])
 
+    def test_podman_namespace_selection(self):
+        shutil.copy(ROOT / 'dev', self.work / 'dev')
+        (self.work / '.env').write_text('WWWUSER=1234\nWWWGROUP=2345\n')
+        for name, body in {
+            'uname': '#!/bin/sh\necho Linux\n',
+            'podman': '#!/bin/sh\necho "$TEST_ROOTLESS"\n',
+            'podman-compose': "#!/usr/bin/env python3\nimport os\nprint(os.environ.get('COMPOSE_FILE', ''))\n",
+        }.items():
+            stub = self.bin / name
+            stub.write_text(body)
+            stub.chmod(0o755)
+        for rootless, existing, expected in [
+            ('true', '', 'docker-compose.yml:docker-compose.podman.yml'),
+            ('false', '', ''),
+            ('true', 'custom.yml', 'custom.yml:docker-compose.podman.yml'),
+        ]:
+            with self.subTest(rootless=rootless, existing=existing):
+                env = dict(self.env, DOCKER_COMPOSE='podman-compose',
+                           TEST_ROOTLESS=rootless, COMPOSE_FILE=existing,
+                           COMPOSE_PATH_SEPARATOR=':')
+                result = subprocess.run(['bash', str(self.work / 'dev'), 'ps'],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+
     def test_default_destination(self):
         self.assertEqual(self.composer('create-project', 'laravel/laravel').returncode, 0)
         self.assertEqual(self.calls(), [['dev-exec', 'composer', 'create-project', 'laravel/laravel', '.'], ['configure-web']])

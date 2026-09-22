@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+# Clear orphaned workers before s6 restarts the master process.
+killall -KILL php-fpm 2>/dev/null || true

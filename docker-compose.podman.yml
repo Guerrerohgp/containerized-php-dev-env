@@ -1,0 +1,7 @@
+# Applied by ./dev for rootless Podman on Linux.
+services:
+    app:
+        # Map the Podman caller to sail, even when .env uses different IDs.
+        userns_mode: 'keep-id:uid=${WWWUSER:-1000},gid=${WWWGROUP:-1000}'
+        # Startup configures users and Nginx before dropping privileges for PHP.
+        user: '0:0'

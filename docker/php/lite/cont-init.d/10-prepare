@@ -1,0 +1,13 @@
+#!/command/with-contenv sh
+set -eu
+mkdir -p /run/nginx
+groupmod -o -g "${WWWGROUP:-1000}" sail
+usermod -o -u "${WWWUSER:-1000}" -g "${WWWGROUP:-1000}" sail
+chown sail:sail /home/sail
+sed -i -e 's/^user = .*/user = sail/' -e 's/^group = .*/group = sail/' /usr/local/etc/php-fpm.d/www.conf
+configure-web
+touch /var/log/xdebug.log
+chown www-data:www-data /var/log/xdebug.log
+chmod 666 /var/log/xdebug.log
+php-fpm -t
+nginx -t

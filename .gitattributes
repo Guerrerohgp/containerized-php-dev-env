@@ -5,6 +5,7 @@
 *.sh text eol=lf
 dev text eol=lf
 docker/php/start-container text eol=lf
+docker/php/lite/** text eol=lf
 
 # Batch files should always use CRLF
 *.bat text eol=crlf
