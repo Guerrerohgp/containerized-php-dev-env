@@ -28,7 +28,7 @@ ENV TZ=UTC
 
 # Install runtime tools without the Ubuntu PPA or recommended packages.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl zip unzip git supervisor sqlite3 nginx \
+    ca-certificates curl zip unzip git supervisor sqlite3 nginx util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # The installer removes extension build dependencies when it finishes.
@@ -62,7 +62,8 @@ RUN curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php \
 RUN groupadd --force -g "$WWWGROUP" sail \
     && useradd -ms /bin/bash --no-user-group -g "$WWWGROUP" -u 1337 sail
 
-COPY start-container /usr/local/bin/start-container
+COPY start-container dev-exec dev-composer dev-wp configure-web /usr/local/bin/
+COPY welcome/ /var/www/welcome/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY php.ini /usr/local/etc/php/conf.d/99-sail.ini
 COPY xdebug.ini /usr/local/etc/php/conf.d/99-xdebug-settings.ini
@@ -77,7 +78,7 @@ RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
         -e "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" \
         -e "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" \
         "$PHP_INI_DIR/conf.d/99-sail.ini" \
-    && chmod +x /usr/local/bin/start-container
+    && chmod +x /usr/local/bin/start-container /usr/local/bin/dev-exec /usr/local/bin/dev-composer /usr/local/bin/dev-wp /usr/local/bin/configure-web
 
 EXPOSE 80
 
