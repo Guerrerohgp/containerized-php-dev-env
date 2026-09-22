@@ -13,6 +13,7 @@ elif [ -d /var/www/html/web ]; then
 elif [ ! -f /var/www/html/index.php ] && [ ! -f /var/www/html/index.html ]; then
     root=/var/www/welcome
 fi
-sed -i "s|^    root .*;|    root $root;|" /etc/nginx/sites-available/default
+sed -i.bak "s|^    root .*;|    root $root;|" /etc/nginx/sites-available/default
+rm /etc/nginx/sites-available/default.bak
 nginx -t
 if [ -s /run/nginx.pid ]; then nginx -s reload; fi
