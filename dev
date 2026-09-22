@@ -80,7 +80,28 @@ display_help() {
     echo "  help        Show this help message"
 }
 
+# A shell-provided mode takes precedence over the .env default.
+requested_lite="${lite-}"
 load_env
+lite="${requested_lite:-${lite:-false}}"
+case "$lite" in
+    true)
+        if [ "${PHP_VERSION:-8.5}" != "8.5" ]; then
+            echo "lite=true requires PHP_VERSION=8.5. Use lite=false for other versions." >&2
+            exit 1
+        fi
+        export DEV_DOCKERFILE=Dockerfile.lite
+        export DEV_IMAGE_SUFFIX=-lite
+        ;;
+    false)
+        export DEV_DOCKERFILE=Dockerfile
+        export DEV_IMAGE_SUFFIX=""
+        ;;
+    *)
+        echo "Invalid lite value '$lite': use true or false." >&2
+        exit 1
+        ;;
+esac
 
 PROJECT_NAME="${PROJECT_NAME:-myapp}"
 PROJECT_DOMAIN="${PROJECT_DOMAIN:-myapp.test}"

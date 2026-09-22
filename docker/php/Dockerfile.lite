@@ -1,0 +1,100 @@
+ARG NODE_VERSION=20
+FROM docker.io/library/node:${NODE_VERSION}-alpine3.23 AS node
+FROM docker.io/library/php:8.5-fpm-alpine3.23 AS builder
+
+ARG PHP_EXTENSION_INSTALLER_VERSION=2.11.15
+ARG S6_OVERLAY_VERSION=3.2.3.2
+RUN curl -fsSL \
+    "https://github.com/mlocati/docker-php-extension-installer/releases/download/${PHP_EXTENSION_INSTALLER_VERSION}/install-php-extensions" \
+    -o /usr/local/bin/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions \
+    && install-php-extensions \
+        bcmath gd intl mysqli pdo_mysql pgsql pdo_pgsql zip \
+        imap soap tidy redis xdebug opcache
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php \
+    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+    && curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+        -o /usr/local/bin/wp \
+    && chmod +x /usr/local/bin/wp \
+    && apk add --no-cache binutils pax-utils xz \
+    && strip --strip-unneeded /usr/local/bin/php /usr/local/sbin/php-fpm \
+        /usr/local/bin/node /usr/local/lib/php/extensions/*/*.so
+
+# List the shared-library providers needed by PHP, extensions, and Node.
+RUN scanelf --needed --nobanner --format '%n#p' --recursive /usr/local \
+    | tr ',' '\n' | sort -u \
+    | awk '{print "so:" $1}' > /runtime-packages
+
+# Extract the pinned, checksum-verified s6 overlay in the builder only.
+RUN set -eu; \
+    case "$(apk --print-arch)" in \
+        x86_64|aarch64) s6_arch="$(apk --print-arch)" ;; \
+        *) echo "Lite currently supports amd64 and arm64" >&2; exit 1 ;; \
+    esac; \
+    mkdir /s6-root; \
+    for archive in s6-overlay-noarch.tar.xz "s6-overlay-${s6_arch}.tar.xz"; do \
+        curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/${archive}" -o "/tmp/${archive}"; \
+        curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/${archive}.sha256" -o "/tmp/${archive}.sha256"; \
+        (cd /tmp && sha256sum -c "${archive}.sha256"); \
+        tar -C /s6-root -Jxpf "/tmp/${archive}"; \
+    done
+
+FROM docker.io/library/alpine:3.23 AS app
+LABEL maintainer="PHP Docker"
+ARG PHP_VERSION=8.5
+ARG WWWGROUP=1000
+ENV TZ=UTC PHP_INI_DIR=/usr/local/etc/php S6_BEHAVIOUR_IF_STAGE2_FAILS=2
+WORKDIR /var/www/html
+
+COPY --from=builder /runtime-packages /tmp/runtime-packages
+RUN test "$PHP_VERSION" = 8.5 \
+    && apk add --no-cache $(cat /tmp/runtime-packages) \
+        bash ca-certificates curl zip unzip git sqlite nginx icu-data-full shadow su-exec \
+    && rm /tmp/runtime-packages
+COPY --from=builder /s6-root/ /
+
+COPY --from=builder /usr/local/bin/php /usr/local/bin/node /usr/local/bin/composer /usr/local/bin/wp /usr/local/bin/
+COPY --from=builder /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
+COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=builder /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+COPY --from=builder /usr/local/etc/php /usr/local/etc/php
+COPY --from=builder /usr/local/etc/php-fpm.conf /usr/local/etc/php-fpm.conf
+COPY --from=builder /usr/local/etc/php-fpm.d /usr/local/etc/php-fpm.d
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && adduser -S -D -H -u 82 -G www-data www-data \
+    && groupadd -o -g "$WWWGROUP" sail \
+    && adduser -D -u 1337 -G sail -s /bin/bash sail \
+    && mkdir -p /run/nginx /var/log/nginx \
+    && ln -sf /dev/stdout /var/log/nginx/access.log \
+    && ln -sf /dev/stderr /var/log/nginx/error.log
+
+COPY dev-composer dev-wp configure-web /usr/local/bin/
+COPY lite/dev-exec /usr/local/bin/dev-exec
+COPY welcome/ /var/www/welcome/
+COPY lite/cont-init.d/ /etc/cont-init.d/
+COPY lite/services.d/ /etc/services.d/
+COPY php.ini /usr/local/etc/php/conf.d/99-sail.ini
+COPY xdebug.ini /usr/local/etc/php/conf.d/99-xdebug-settings.ini
+COPY fpm-env.conf /usr/local/etc/php-fpm.d/zzz-sail.conf
+COPY nginx-default /etc/nginx/sites-available/default
+RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/http.d/default.conf \
+    && printf 'pid /run/nginx.pid;\n' >> /etc/nginx/nginx.conf
+ARG PHP_POST_MAX_SIZE=100M
+ARG PHP_UPLOAD_MAX_FILESIZE=100M
+ARG PHP_MAX_EXECUTION_TIME=300
+ARG PHP_SHORT_OPEN_TAG=On
+RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
+    && sed -i \
+        -e "s/\${PHP_POST_MAX_SIZE}/${PHP_POST_MAX_SIZE}/g" \
+        -e "s/\${PHP_UPLOAD_MAX_FILESIZE}/${PHP_UPLOAD_MAX_FILESIZE}/g" \
+        -e "s/\${PHP_MAX_EXECUTION_TIME}/${PHP_MAX_EXECUTION_TIME}/g" \
+        -e "s/\${PHP_SHORT_OPEN_TAG}/${PHP_SHORT_OPEN_TAG}/g" \
+        "$PHP_INI_DIR/conf.d/99-sail.ini" \
+    && chmod +x /usr/local/bin/dev-exec /usr/local/bin/dev-composer /usr/local/bin/dev-wp /usr/local/bin/configure-web /etc/cont-init.d/* /etc/services.d/*/run /etc/services.d/*/finish
+EXPOSE 80
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/init"]

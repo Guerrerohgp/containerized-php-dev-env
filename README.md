@@ -6,7 +6,8 @@ A generic, configurable Docker and Podman development environment for PHP projec
 
 ## Features
 
-- **Debian Slim Base**: Official PHP-FPM images, including legacy PHP 7.4; PHP 8.5 by default
+- **Optional Lite Image**: Smaller PHP 8.5 image selected with `lite=true`
+- **Debian Slim Full Image**: Official PHP-FPM images, including legacy PHP 7.4; PHP 8.5 by default
 - **Dual Database Support**: MySQL 8.0 and PostgreSQL 16 running simultaneously
 - **Built-in Services**: Redis, Mailpit (email testing), SSL proxy
 - **Container Engines**: Docker and Podman with automatic Compose detection
@@ -99,6 +100,7 @@ Edit the `.env` file to customize your setup:
 | Variable                  | Default | Description                             |
 | ------------------------- | ------- | --------------------------------------- |
 | `PHP_VERSION`             | `8.5`   | PHP version: 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5   |
+| `lite` | `false` | Select the optimized PHP 8.5-only image through `./dev` or `dev.bat` |
 | `NODE_VERSION`            | `20`    | Node.js version                         |
 | `PHP_POST_MAX_SIZE`       | `100M`  | Maximum POST data size                  |
 | `PHP_UPLOAD_MAX_FILESIZE` | `100M`  | Maximum upload file size                |
@@ -112,7 +114,7 @@ The default is **PHP 8.5**, the latest stable branch reviewed as of September 20
 
 The default stays on the explicit `8.5` branch to receive patch updates when the base image is refreshed, without silently moving to a future minor release. Existing `.env` files keep their selected version; set `PHP_VERSION=8.5` to opt in, then rebuild with `./dev build --pull app` and recreate with `./dev up --force-recreate app`.
 
-The app automatically selects an official Debian-based PHP-FPM image using `PHP_VERSION`:
+The full image (`lite=false`) automatically selects an official Debian-based PHP-FPM image using `PHP_VERSION`:
 
 | PHP version | Debian base |
 |-------------|-------------|
@@ -145,6 +147,41 @@ docker run --rm --entrypoint php phplocaldocker-smoke:7.4 -v
 ```
 
 For Podman, replace `docker` with `podman` in these commands. Final image size depends on the selected versions and included tools.
+
+### Lite Image (PHP 8.5 Only)
+
+Set these values in `.env`:
+
+```env
+PHP_VERSION=8.5
+lite=true
+```
+
+Build and recreate the app:
+
+```bash
+./dev build app
+./dev up --force-recreate app
+```
+
+On Windows CMD, use `dev.bat build app` and `dev.bat up --force-recreate app`. Set `lite=false` and repeat these commands to return to the full image. Both modes use the same services, network, and database volumes, with separate app image names to avoid overwriting one another. Other PHP versions require `lite=false`.
+
+Lite uses `docker/php/Dockerfile.lite` with Alpine 3.23 and s6-overlay instead of Supervisor. PHP and extensions are compiled in a separate builder stage; the final image includes only runtime binaries and libraries. s6 starts Nginx and PHP-FPM, restarts crashed services, and handles container shutdown without Python or Supervisor.
+
+PHP extensions, Xdebug, Node/npm/npx, Composer, WP-CLI, Git, SQLite, Bash, and full ICU locale data remain available. Compilers, development headers, PHP extension build helpers, and native debugging symbols are omitted. Installing extra extensions or compiling native npm modules inside the container requires additional build tools or the full image.
+
+Lite supports AMD64 and ARM64. Alpine uses musl rather than glibc: proprietary binaries and some native npm packages may require Alpine-compatible builds. Use the full Debian image when your project requires glibc or Debian packages. The full image continues to use Supervisor and supports the other PHP versions.
+
+The tested ARM64 PHP 8.5/Node 20 build is **275 MB**, compared with **468 MB** for the previous Debian lite image and **749 MB** for the full image: approximately **41.3% smaller than previous lite** and **63.3% smaller than full**. These are local uncompressed image sizes; architecture and upstream package updates affect the result.
+
+The `lite` setting is interpreted by the Dev launchers; bare `docker compose` or `podman compose` does not translate it. For a standalone build and runtime check:
+
+```bash
+docker build -f docker/php/Dockerfile.lite -t phplocaldocker-lite docker/php
+python3 tests/smoke_lite.py phplocaldocker-lite
+```
+
+For Podman, replace `docker build` with `podman build` and add `--engine podman` to the test command. Launcher selection checks run with `python3 -m unittest discover -s tests -v`.
 
 ### Database Settings
 
@@ -524,6 +561,8 @@ docker system prune -a  # Clean all unused Docker resources
     │   └── create-testing-database.sh
     ├── php/
     │   ├── Dockerfile
+    │   ├── Dockerfile.lite    # Alpine PHP 8.5-only image
+    │   ├── lite/              # s6 initialization and service scripts
     │   ├── bullseye-sources.list # Frozen package sources for legacy PHP
     │   ├── php.ini
     │   ├── xdebug.ini

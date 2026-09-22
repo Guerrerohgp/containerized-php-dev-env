@@ -1,0 +1,2 @@
+#!/command/with-contenv sh
+exec /usr/local/sbin/php-fpm -F

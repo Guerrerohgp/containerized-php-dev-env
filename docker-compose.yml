@@ -2,12 +2,12 @@ services:
     app:
         build:
             context: ./docker/php
-            dockerfile: Dockerfile
+            dockerfile: '${DEV_DOCKERFILE:-Dockerfile}'
             args:
                 WWWGROUP: '${WWWGROUP:-1000}'
                 PHP_VERSION: '${PHP_VERSION:-8.5}'
                 NODE_VERSION: '${NODE_VERSION:-20}'
-        image: sail-${PHP_VERSION:-8.5}/app
+        image: sail-${PHP_VERSION:-8.5}${DEV_IMAGE_SUFFIX:-}/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:

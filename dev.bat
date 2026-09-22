@@ -36,6 +36,7 @@ if "%1"=="help" goto help
 if "%1"=="--help" goto help
 if "%1"=="-h" goto help
 
+set "DEV_LITE_OVERRIDE=%lite%"
 if exist .env (
     for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
         set "line=%%a"
@@ -51,6 +52,23 @@ if exist .env (
             )
         )
     )
+)
+
+rem A shell-provided mode takes precedence over the .env default.
+if defined DEV_LITE_OVERRIDE set "lite=%DEV_LITE_OVERRIDE%"
+if not defined lite set "lite=false"
+set "DEV_DOCKERFILE=Dockerfile"
+set "DEV_IMAGE_SUFFIX="
+if "%lite%"=="true" (
+    if defined PHP_VERSION if not "%PHP_VERSION%"=="8.5" (
+        echo lite=true requires PHP_VERSION=8.5. Use lite=false for other versions.
+        exit /b 1
+    )
+    set "DEV_DOCKERFILE=Dockerfile.lite"
+    set "DEV_IMAGE_SUFFIX=-lite"
+) else if not "%lite%"=="false" (
+    echo Invalid lite value: use true or false.
+    exit /b 1
 )
 
 set PROJECT_NAME=%PROJECT_NAME%
