@@ -14,7 +14,7 @@ if [ "${1:-}" = up ]; then
     if [ -n "${SUDO_UID:-}" ]; then chown "$SUDO_UID:$SUDO_GID" src; fi
 fi
 
-if [ -z "$DOCKER_COMPOSE" ]; then
+if [ "${1:-}" != hosts ] && [ -z "$DOCKER_COMPOSE" ]; then
     if command -v podman-compose &> /dev/null; then
         DOCKER_COMPOSE="podman-compose"
     elif command -v podman &> /dev/null && podman compose version &> /dev/null; then
@@ -74,6 +74,7 @@ display_help() {
     echo "  mailpit     Show Mailpit logs"
     echo "  stop        Stop the containers"
     echo "  restart     Restart the containers"
+    echo "  hosts       Add a local domain to the hosts file (optional domain argument)"
     echo "  ssl         Generate SSL certificates"
     echo "  backup      Backup all databases"
     echo "  restore     Restore databases (./dev restore --help)"
@@ -83,6 +84,10 @@ display_help() {
 # A shell-provided mode takes precedence over the .env default.
 requested_lite="${lite-}"
 load_env
+if [ "${1:-}" = hosts ]; then
+    if [ "$#" -gt 2 ]; then echo 'Usage: ./dev hosts [domain]' >&2; exit 1; fi
+    exec bash docker/scripts/hosts.sh "${2:-${PROJECT_DOMAIN:-myapp.test}}" "${APP_PORT:-80}"
+fi
 lite="${requested_lite:-${lite:-false}}"
 case "$lite" in
     true)
@@ -133,8 +138,7 @@ if [ $# -gt 0 ]; then
             if [ ! -s docker/ssl/certs/server.crt ] || [ ! -s docker/ssl/certs/server.key ]; then
                 bash docker/ssl/generate-certs.sh
             fi
-            $DOCKER_COMPOSE up -d "$@"
-            echo "Application: http://localhost:${APP_PORT:-8080} (code in src/)"
+            bash docker/scripts/up.sh "$@"
             ;;
         "down")
             shift
