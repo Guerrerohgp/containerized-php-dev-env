@@ -23,7 +23,7 @@ if %errorlevel% equ 0 (
             if !errorlevel! equ 0 (
                 set DOCKER_COMPOSE=docker compose
             ) else (
-                echo No container compose tool installed (podman-compose or docker-compose).
+                echo No container compose tool installed ^(podman-compose or docker-compose^).
                 exit /b 1
             )
         )
